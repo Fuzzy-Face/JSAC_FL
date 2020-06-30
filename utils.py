@@ -85,14 +85,14 @@ def log2_comb(n, k):
 
 #     return q_array, b_array
 
-def dig_sparse_level(E, CG, N, Chi, N0, log2_comb_list, d = 7850):
+def dig_sparse_level(G, CG, N, Chi, N0, log2_comb_list, d = 7850):
     # s =  d / 3  # d\times 1 is the dimension of total number of parameters for each model, i.e., W.shape[0] * W.shape[1] + len(b)
-    barP = .001 
-    q_array, b_array = [], {}
+    barP = .2 / N 
+    q_array, b_array = [], []
     for i in range(CG.shape[0]):
         b = 64
         idx = np.nonzero(np.array(log2_comb_list) + b * np.arange(d + 1) <= 
-        N / (2 * Chi) * np.log2(1 + barP * Chi * min(CG[i][[j-1 for j in MyNeighbour(E, i+1)]]) / N0))[0]
+        N / Chi * np.log2(1 + barP * Chi / N0 * min(CG[i,[j-1 for j in G[i]]])))[0]
         while not np.any(idx):
             if b == 16:
                 print ("Fetal failure occurs!")
@@ -101,12 +101,12 @@ def dig_sparse_level(E, CG, N, Chi, N0, log2_comb_list, d = 7850):
                 break
             b = b / 2
             idx = np.nonzero(np.array(log2_comb_list) + b * np.arange(d + 1) <= 
-        N / (2 * Chi) * np.log2(1 + barP * Chi * min(CG[i][[j-1 for j in MyNeighbour(E, i+1)]]) / N0))[0]
+                    N / Chi * np.log2(1 + barP * Chi / N0 * min(CG[i,[j-1 for j in G[i]]])))[0]
         if not np.any(idx):
             q_array.append(d)
         else:
-            q_array.append(max(idx)) # SignPolarDominatingAverage
-        b_array[q_array[i]] = b
+            q_array.append(max(idx)) 
+        b_array.append (b)
     #q_array = [max(np.nonzero(np.log2(binom_list) + b + range(min([np.ceil(d / 2) + 1, 140])) <= s / (2*2*Chi)*np.log2(1+P_t * CG[i-1][j-1] / s))[0]) for i,j in E] # SignTopK
 
     return q_array, b_array
@@ -210,36 +210,34 @@ def TwoSectionH(G): # Generate the 2-section of the proposed hypergraph, i.e., H
             
 #     return quantized_theta, acc_error #A list (device_i's) of the quantized theta_i's and the quantization error
 
-def  comp_quant_encoding(flattened_theta, acc_error, q_array, b_array, confidential = .995):
-    # flattened_theta is of data type "NDarray"
-    # acc_error is a list (device_i's) of different \Delta_{ji}'s, which records the difference between the actual theta_j and the quantized tilde_theta_{ji} that device j prepares to transmit to its neighbour i
-
-    quantized_theta = [] # A list (device_i's) of quantized theta_{i}'s that device i prepares to send to its neighbours
-    for i in range(flattened_theta.shape[0]):
-        q = q_array[i] 
-        b = b_array[q_array[i]]
-        EC_flattened_theta_i = flattened_theta[i] + acc_error[i] 
+def  comp_quant_encoding(flattened_theta_by_Devices, flattened_hat_theta_by_Devices, q_array, b_array, confidential = .995):
+    # var_lists_by_Devices is of structure [[\theta_0^{W}, \theta_0^{b}],.....[\theta_K^{W}, \theta_K^{b}]] by devices
+    d = flattened_theta_by_Devices[0].size
+    # Q_model_difference = [] # A list (device_i's) of quantized theta_{i}'s that device i prepares to send to its neighbours
+    for i in range(len(flattened_theta_by_Devices)):
+        b = b_array[i]
+        model_difference_i = flattened_theta_by_Devices[i] - flattened_hat_theta_by_Devices[i]
         # theta_min = np.quantile(EC_flattened_theta_ji, 1-confidential)
         # theta_max = np.quantile(EC_flattened_theta_ji, confidential)
         # EC_flattened_theta_ji = np.maximum(EC_flattened_theta_ji, theta_min)
         # EC_flattened_theta_ji = np.minimum(EC_flattened_theta_ji, theta_max)
 
-        idx = np.argsort(np.abs(EC_flattened_theta_i))[flattened_theta.shape[1]-q:]  # Index for the Top-q entries
+        idx = np.argsort(np.abs(model_difference_i))[d-q_array[i]:]  # Index for the top-q entries
             
-        # the quantized theta_i that adopts Top-q entries
-        Qtheta = np.zeros(flattened_theta[i].shape)
+        # the quantized theta_i that adopts b-bit float point encoding for each of the top-q entry
+        Q_model_difference_i = np.zeros((d,))
         # The TopQ entries
-        domi_theta = EC_flattened_theta_i[idx] 
+        domi_theta = model_difference_i[idx] 
         if b:
-            Qtheta[idx] = domi_theta.astype(eval("np.float{:d}".format(int(b))))
+            Q_model_difference_i[idx] = domi_theta.astype(eval("np.float{:d}".format(int(b))))
         else:
-            Qtheta[idx] = np.sign(domi_theta)
+            Q_model_difference_i[idx] = np.sign(domi_theta)
 
-        # Update the accumulated error
-        acc_error[i] += (flattened_theta[i] - Qtheta)
-        quantized_theta.append(Qtheta) 
+        # Update flattened_hat_theta
+        flattened_hat_theta_by_Devices[i] += Q_model_difference_i
+        # Q_model_difference.append(Q_model_difference_i) 
             
-    return quantized_theta, acc_error #A list (device_i's) of the quantized theta_i's and the quantization error
+    return flattened_hat_theta_by_Devices #A list (device_i's) of the estimated theta_i's that are readily used for consensus update
 
 
 def sample_data( i, t, train_images, train_labels, device_size = 7500, batch_size = 1024 ):
