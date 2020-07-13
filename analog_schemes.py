@@ -4,78 +4,72 @@ from utils import MyNeighbour
 from sklearn.linear_model import Lasso, MultiTaskLasso, OrthogonalMatchingPursuit
 import gc
 
-def Rx_DSGD(G, CH, W, flattened_theta_by_devices, N, A, A_dag, N0, noise, acc_error, sr, estimator = 'Lasso', sigma_square = .01, lamda = 1e-6, K = 8, d = 7850):
+def Rx_DSGD(G, flattened_theta_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices, W, zeta, CH, CG, N, schedule_list, Tx_times, H_par, N0 = 10 ** (-169/10) * 1e-3, d = 7850, tilde_d = 2 ** 13):
+    K = len(G.nodes())
+    m = H_par.shape[0]
+    r = np.random.binomial(1, .5, (tilde_d,))
+    r[r == 0] = -1
+    temp = [H_par[i,:] * r for i in range(m)]
+    A = (1 / np.sqrt(m)) * np.array(temp) # A^{(t)} is of shape (m, d)
+    ########## for flat matrix U (RLC solution) ############
+    # A list (device_i's) of model differences that device i prepares to send to its neighbours
+    model_diff = [flattened_theta_by_devices[i] - flattened_hat_theta_by_devices[i]
+                            for i in range(K)] 
+    # A list (device_i's) of compressed signal that device i prepares to send to its neighbours before (transmitting) power scaling
+    phi = [ A @  np.concatenate((model_diff[i], np.zeros( (tilde_d- d,) )), axis = 0) for i in range(K)] 
+    barP = .2 / N
+    
+    # Calculate the transmit power sacling factor gamma_i for device i's scheduled neighbors and the transmit power scaling factor alpha_i for device i itself (as the BC node) when device i is scheduled as the star center 
+    gamma = {}
+    alpha = {}
+    for i in len(schedule_list):
+        for star in schedule_list[i]:
+            gamma[star] = min( barP * N /sum(Tx_times[j]) * CG[j,star] / ((np.abs(W[star,j])**2) * (np.linalg.norm(phi[j],2)**2)) for j in schedule_list[i][star] )
+            alpha[star] = barP * N /sum(Tx_times[star]) / np.linalg.norm(phi[star],2)**2
 
-    barP = .001
-    EC_flattened_theta_by_devices = [flattened_theta_by_devices[i] + acc_error[i] for i in range(K)]
-    ######### for skinny matrix U (least-square solution) ############
-    if A.shape[0] >= A.shape[1]:
-        gamma = min([barP * N / (np.linalg.norm(A @ EC_flattened_theta_by_devices[j],2) ** 2 * sum(1/np.abs(CH[j][i]) ** 2 for i in G[j])) 
-                        for j in range(K)])
-        y = [ np.sqrt(gamma) * A @ sum (EC_flattened_theta_by_devices[j] for j in G[i]) + noise[i] for i in range(K)]
+    # Calculate the #times for which device i receives, i.e., # of added AWGN
+    Rx_times ={node:sum(Tx_times[node]) for node in G.nodes()}
+    # Generate random noise a number of receiving times for device i
+    noise =  [iter(np.sqrt(N0 / 2) * np.random.randn(Rx_times[node],m) + 1j * np.sqrt(N0 / 2) * np.random.randn(Rx_times[node],m))
+                    for node in G.nodes()]
 
-    # U = [LMMSE_Rx(i, G, CH, A, alpha, Rsc[i], Rcc[i]) for i in range(K)] # a list (device_i's) of detection matrix U_i at the Rx of device i
-        hat_y = [np.real(y[i]) / np.sqrt(gamma) for i in range(K)] # a list (device_i's) of estimated received signal at device i, i.e., A\sum_{j\in\mathcal{N}_i}\theta_j
-        hat_sum_theta =[A_dag @ hat_y[i] 
-                            for i in range(K)] # a list (device_i's) of estimated sum of parameters from the adjacent nodes of i, i.e., \sum_{j\in\mathcal{N}_i}\theta_j
-    else:
-    ########## for flat matrix U (sparse-recovery solution) ############
-        k = int((1- sr ** (1 / K)) * d )
-        sparse_EC_flattened_theta_by_devices = np.zeros(flattened_theta_by_devices.shape) # A list (device_i's) of quantized theta_{i}'s that device i prepares to send to its neighbours
-        for i in range(K):
-            idx = np.argsort(np.abs(EC_flattened_theta_by_devices[i]))[d-k:]  # Index for the Top-q entries
-            sparse_EC_flattened_theta_by_devices[i][idx] = EC_flattened_theta_by_devices[i][idx]
-
-        gamma = min([barP * N / (np.linalg.norm(A @ sparse_EC_flattened_theta_by_devices[j],2) ** 2 * sum(1 / np.abs(CH[j][i]) ** 2 for i in G[j])) 
-                        for j in range(K)])
-
-        y = [ np.sqrt(gamma) * A @ sum (sparse_EC_flattened_theta_by_devices[j] for j in G[i]) + noise[i] 
-                for i in range(K)]       
-        # U = [LMMSE_Rx(i, G, CH, A, gamma, Rsc[i], Rcc[i]) for i in range(K)] # a list (device_i's) of detection matrix U_i at the Rx of device i
-        hat_y = [np.real(y[i]) / np.sqrt(gamma) for i in range(K)] # a list (device_i's) of estimated received signal at device i, i.e., A\sum_{j\in\mathcal{N}_i}\theta_j
-
-        if estimator =='OMP':
-            # n_nonzeros = [len(np.nonzero(sum(sparse_EC_flattened_theta_by_devices[j] for j in G[i]))[0]) for i in range(K)] #a list (device_i's) of number_of_nonzeros in the target signal
-            # hat_sum_theta = [ OrthogonalMatchingPursuit(n_nonzeros[i]).fit( A, hat_y[i] ).coef_ for i in range(K) ]
-            hat_sum_theta = [ OrthogonalMatchingPursuit(int(min(A.shape[0], 0.1 * d))).fit( A, hat_y[i] ).coef_ for i in range(K) ] # construct a list (device_i's) of estimated sum of parameters from the adjacent nodes of i, i.e., \sum_{j\in\mathcal{N}_i}\theta_j
-            OMP_error = [ np.mean(np.abs(hat_sum_theta[i] - sum(sparse_EC_flattened_theta_by_devices[j] for j in G[i])) ** 2) for i in range(K) ]
-            OMP_rel_error = [OMP_error[i] / np.mean(np.abs(sum(sparse_EC_flattened_theta_by_devices[j] for j in G[i])) ** 2) for i in range(K) ]
-            print("Normalized MSE(dB):", "|".join("{:.2f}".format(10 * np.log10(OMP_rel_error[i])) for i in range(K)))
+    # (1st step) Process the received signal, by, e.g., re-scaling for decoding
+    post_y_by_devices = []
+    for node in range(K):
+        post_y = sum( W[node,j] * phi[j] for j in G[node] )
+        if node in gamma:
+            post_y += next(noise[node]) / np.sqrt(gamma[node])
+            for schedule in schedule_list:
+                AirCompSet = schedule.get(node)
+                if AirCompSet:
+                    break
         else:
-            hat_sum_theta = [ Lasso(alpha = lamda, fit_intercept = False).fit( A, hat_y[i] ).coef_ for i in range(K) ] # construct a list (device_i's) of estimated sum of parameters from the adjacent nodes of i, i.e., \sum_{j\in\mathcal{N}_i}\theta_j
-            # hat_sum_theta = MultiTaskLasso(alpha = lamda, fit_intercept = False).fit( A, list(zip(*hat_y)) ).coef_ # construct a list (device_i's) of estimated sum of parameters from the adjacent nodes of i, i.e., \sum_{j\in\mathcal{N}_i}\theta_j
-            Lasso_error = [ np.mean(np.abs(hat_sum_theta[i] - sum(sparse_EC_flattened_theta_by_devices[j] for j in G[i])) ** 2) for i in range(K) ]
-            print("Normalized MSE(dB):", "|".join("{:.2f}".format(10 * np.log10(Lasso_error[i])) for i in range(K)))
-            # hat_sum_theta = [ AMP( A, hat_y[i], N0, mu = 0, sigma_square = sigma_square, shape = (d,) ) for i in range(K) ] # construct a list (device_i's) of estimated sum of parameters from the adjacent nodes of i, i.e., \sum_{j\in\mathcal{N}_i}\theta_j
-            # AMP_error = [ np.mean(np.abs(hat_sum_theta[i] - sum(sparse_EC_flattened_theta_by_devices[j] for j in G[i])) ** 2) for i in range(K) ]
-            # AMP_rel_error = [AMP_error[i] / np.mean(np.abs(sum(sparse_EC_flattened_theta_by_devices[j] for j in G[i])) ** 2) for i in range(K) ]
-            # print("Normalized MSE(dB):", "|".join("{:.2f}".format(10 * np.log10(AMP_rel_error[i])) for i in range(K)))
+            AirCompSet = {}
+        for j in G[node]:
+            if j not in AirCompSet:
+                post_y += W[node,j] * next(noise[node]) / ( CH[j,node] * np.sqrt(alpha[j]) )
+        post_y_by_devices.append(post_y)
 
+    # (12nd step) Process the rescaled signal by m/d * A.T @ real(post_y)            
+    for i in range(K):
+        hat_y_by_devices[i] += (m/d * A.T @ np.real(post_y[i]))[:d]
+        flattened_hat_theta_by_devices[i] += (m/d * A.T @ phi[i])[:d]
 
+    RLC_error = [ np.linalg.norm((m/d * A.T @ np.real(post_y[i]))[:d] - sum( W[i,j] * model_diff[j] for j in G[i] ), 2)**2 / np. linalg.norm(sum( W[i,j] * model_diff[j] for j in G[i] ), 2)**2 
+                    for i in range(K) ]
+    
+    print("Normalized MSE(dB):", "|".join("{:.2f}".format(10 * np.log10(RLC_error[i])) for i in range(K)))
 
-    # flattened_tilde_theta_by_devices turns out to be a list (device_i's) of combined theta_i's used for the consensus step)
-    alpha = W[0][[j for j in G[0]][0]]
-    flattened_tilde_theta_by_devices = np.array([(1-G.degree[i] * alpha) * flattened_theta_by_devices[i] + alpha * hat_sum_theta[i]
-                                                    for i in range(K)])  
+    # flattened_theta_next_by_devices turns out to be a list (device_i's) of aggregate theta_i's after the consensus update)
+    flattened_theta_next_by_devices = [ flattened_theta_by_devices[i] + 
+                                                zeta * ( W[i,i]*flattened_hat_theta_by_devices[i] + hat_y_by_devices[i] -
+                                                        flattened_hat_theta_by_devices[i] ) 
+                                                    for i in range(K) ]
+    # Unflatten the theta_next's in a list (device_i's) of [theta_{i}^{W}, theta_{i}^{b}]
+    theta_next_by_devices = [[flattened_theta_next_by_devices[i][:7840].reshape((784,10)),  
+                                flattened_theta_next_by_devices[i][7840:]] for i in range(K)] 
 
-    # Unflatten the combined theta_i's in a list (device_i's) of [theta_{i}^W, theta_{i}^b]
-    tilde_theta_by_devices = [[flattened_tilde_theta_by_devices[i][:7840].reshape((784, 10)),
-                               flattened_tilde_theta_by_devices[i][7840:]] for i in range(K)]
-    # Update the estimated self and cross co-variance matrices using the exponential weighted moving average (EWMA)
-    # for i in range(K):
-    #     # Rsc[i] = (1 - beta_sc) * (flattened_theta_by_devices[i].reshape(d,1) @ flattened_theta_by_devices[i].reshape(d,1).T) + beta_sc * Rsc[i]
-    #     # Rcc[i] = (1 - beta_cc) * ((flattened_theta_by_devices[i].reshape(d,1) @ hat_sum_theta[i].reshape(d,1).T) / G.degree[i]) + beta_cc * Rcc[i]
-    #     Rsc[i] = (1 - beta_sc) * flattened_theta_by_devices[i] ** 2 + beta_sc * Rsc[i]
-    #     Rcc[i] = (1 - beta_cc) * flattened_theta_by_devices[i] * hat_sum_theta[i] / G.degree[i] + beta_cc * Rcc[i]
-
-    if A.shape[0] >= A.shape[1]:
-        for i in range(K):
-            acc_error[i] += (flattened_theta_by_devices[i] - EC_flattened_theta_by_devices[i])
-    else:
-        for i in range(K):
-            acc_error[i] += (flattened_theta_by_devices[i] - sparse_EC_flattened_theta_by_devices[i])
-
-    return tilde_theta_by_devices, acc_error
+    return theta_next_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices 
 
 
 

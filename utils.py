@@ -60,31 +60,6 @@ def log2_comb(n, k):
     return log2_comb
 
 
-# def dig_sparse_level(E, CG, N, Chi, N0, d = 7850):
-#     # s =  d / 3  # d\times 1 is the dimension of total number of parameters for each model, i.e., W.shape[0] * W.shape[1] + len(b)
-#     barP = 10 
-#     log2_comb_list = [np.ceil(log2_comb(d,q)) for q in range(d // 2 + 1)]
-#     q_array, b_array = [], {}
-#     for i in range(CG.shape[0]):
-#         b = 32
-#         idx = np.nonzero(np.array(log2_comb_list) + b + 1 <= N / (2 * Chi) * np.log2(1 + barP * Chi / N * min(CG[i][[j-1 for j in MyNeighbour(E, i+1)]]) / N0))[0]
-#         while not np.any(idx):
-#             if b == 16:
-#                 print ("Fetal failure occurs!")
-#                 b = 0
-#                 idx = [ 0 ]
-#                 break
-#             b = b / 2
-#             idx = np.nonzero(np.array(log2_comb_list) + b + 1 <= N / (2 * Chi) * np.log2(1 + barP * Chi / N * min(CG[i][[j-1 for j in MyNeighbour(E, i+1)]]) / N0))[0]
-#         if not np.any(idx):
-#             q_array.append(d)
-#         else:
-#             q_array.append(max(idx)) # SignPolarDominatingAverage
-#         b_array[q_array[i]] = b
-#     #q_array = [max(np.nonzero(np.log2(binom_list) + b + range(min([np.ceil(d / 2) + 1, 140])) <= s / (2*2*Chi)*np.log2(1+P_t * CG[i-1][j-1] / s))[0]) for i,j in E] # SignTopK
-
-#     return q_array, b_array
-
 def dig_sparse_level(G, CG, N, Chi, N0, log2_comb_list, d = 7850):
     # s =  d / 3  # d\times 1 is the dimension of total number of parameters for each model, i.e., W.shape[0] * W.shape[1] + len(b)
     barP = .2 / N 
@@ -133,10 +108,10 @@ def TwoSectionH(G): # Generate the 2-section of the proposed hypergraph, i.e., H
 
     H2 = net.Graph() # pylint: disable = undefined-variable
     H2.add_edges_from(H2Edges)
-    vertex_color_map = net.greedy_color(H2, strategy = 'random_sequential') # vertex coloring H2, pylint: disable = undefined-variable
-    Chi = max(vertex_color_map.values()) + 1 # chromatic number of the present coloring scheme
+    vertex_color_map = net.greedy_color(H2, strategy = 'saturation_largest_first') # vertex coloring H2, pylint: disable = undefined-variable
+    # Chi = max(vertex_color_map.values()) + 1 # chromatic number of the present coloring scheme
 
-    return H2, Chi
+    return H2, vertex_color_map
 
 
 # def  comp_quant_encoding(flattened_theta, acc_error, q_array, b_array, confidential = .995):
@@ -224,7 +199,7 @@ def  comp_quant_encoding(flattened_theta_by_Devices, flattened_hat_theta_by_Devi
 
         idx = np.argsort(np.abs(model_difference_i))[d-q_array[i]:]  # Index for the top-q entries
             
-        # the quantized theta_i that adopts b-bit float point encoding for each of the top-q entry
+        # the quantized theta_i that adopts b-bit float-point encoding for each of the top-q entry
         Q_model_difference_i = np.zeros((d,))
         # The TopQ entries
         domi_theta = model_difference_i[idx] 
@@ -306,6 +281,42 @@ def solve_num_per_class(num_lack_max, K):
     prob.solve( verbose = True, solver = cvx.GLPK_MI )
 
     return X, x.value, prob.value
+
+def seq_scheduling(G):
+    # A sequential list (slot's) of star toplogy-based schedule in a form of dicts 
+    star_schedule_list = [] 
+    # key-value pair herein is node (n_b, n_c), where n_b is the #times for which a node transmits as a star center (BC), 
+    # and n_c is the #times for which a node transmits as an outer node
+    Tx_times = {node:(0, 0) for node in G.nodes()} 
+
+    while G:
+        _, from_node_to_color_id = TwoSectionH(G)
+        color_degree = {c: sum( len(G[node]) for node, color in from_node_to_color_id.items() if color == c ) 
+                             for c in from_node_to_color_id.values()}
+        chosen_color = list(color_degree.values()).index(max(color_degree.values())) # find arg_max(degree(color_list))
+
+        # A dict including (star center: associated nodes) pairs that transmits or recieves in parallel at the current slot
+        star_schedule_dict = { node:G[node] for node, color in from_node_to_color_id.items() if color == chosen_color}
+        # Append the scheule in the current slot to the sequential schedule list
+        star_schedule_list.append(star_schedule_dict)
+        # Update n_b for the star center
+        for node in star_schedule_dict.keys():
+            Tx_times[node][0] += 1
+        # Update n_c for the neighbors of the star centers
+        for neighbors in star_schedule_dict.values():
+            for node in neighbors:
+                Tx_times[node][1] += 1
+
+        # Update the graph
+        # Remove the scheduled Rxs, i.e., the star centers
+        G.remove_nodes_from(star_schedule_dict.keys())
+        # Remove any standalone nodes
+        current_node_list = list(G.nodes())
+        for node in current_node_list:
+            if not(G[node]):
+                G.remove_node(node)
+   
+    return star_schedule_list, Tx_times
     
        
 

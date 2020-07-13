@@ -62,3 +62,4 @@ def TDMA_DSGD(G, flattened_theta_by_devices, flattened_hat_theta_by_devices, W, 
                                 flattened_theta_next_by_devices[i][7840:]] for i in range(K)]
 
     return theta_next_by_devices, flattened_hat_theta_by_devices
+    

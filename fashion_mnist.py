@@ -5,10 +5,11 @@ from tensorflow.keras.layers import Dense, Flatten #pylint: disable = import-err
 import matplotlib.pyplot as plt
 import pickle
 import networkx as net
-from utils import solve_graph_weights, get_model, calc_grad, log2_comb, TwoSectionH, solve_num_per_class
+from utils import solve_graph_weights, get_model, calc_grad, log2_comb, TwoSectionH, solve_num_per_class, seq_scheduling
+from scipy.linalg import hadamard
 import digital_schemes as ds
 import analog_schemes as ans
-from scipy.sparse import identity, csr_matrix
+# from scipy.sparse import identity, csr_matrix
 
 
 
@@ -91,30 +92,32 @@ if __name__ == "__main__":
     gamma = 3.76
     PL = A0 * ((D / d0) ** (-gamma))
 
-    com_interval = 1 # Also known as "H" in the SPARQ-SGD paper
+    com_interval = 5 # Also known as "H" in the SPARQ-SGD paper
     training_times = 1 # There will be training_times of lists each with a different setup of blockages, each of which is of (ComRound, K)
     p = 0.2 # The probability that one edge is included in the connectivity graph as per the Erdos-Renyi (random) graph
     T = 1
-    BW = 10 * 1e4
-    N0 = 10 ** (-169/10) * 1e-3  # power spectral density in W
+    BW = 1* 1e4
+    N0 = 10 ** (-169/10) * 1e-3  # power spectral density of the AWGN noise per channel use
     # N0 = 0
     N = T * BW
 
     LOCAL = False
-    scheme = 4
+    scheme = 5
     SCHEME = scheme
     # Generate a learning rate scheduler that returns initial_learning_rate / (1 + decay_rate * t / decay_step)
     decayed_learning = True
     mu = 0.002 # assuming eta = (4/mu/a) / (1 + t/a), where mu = 2*lamda
     b = 4/mu # 4/mu
-    a = 30
+    a = 1000
     initial_lr = b/a
     decay_steps = a
     decay_rate = 1
     learning_rate_fn = keras.optimizers.schedules.InverseTimeDecay(initial_lr,
                                                                     decay_steps, decay_rate)
-
-    zeta = 1
+    decayed_cs = True
+    initial_zeta = 0.1
+    rho_a_prime = 0.3
+    cs_rate_fn = lambda t: initial_zeta / (1 + t/rho_a_prime)
 
     loss_fn = keras.losses.SparseCategoricalCrossentropy()
     acc_fn = keras.metrics.SparseCategoricalAccuracy()
@@ -151,7 +154,7 @@ if __name__ == "__main__":
         # W, _ = solve_graph_weights(K, E)
         alpha = 2 / (D[K-1] + D[1])
         W = np.eye(K) - alpha * L
-        _, Chi = TwoSectionH(G) 
+        # _, Chi = TwoSectionH(G) 
 
 
 
@@ -162,26 +165,43 @@ if __name__ == "__main__":
 
         log2_comb_list = [np.ceil(log2_comb(d,q)) for q in range(d + 1)]
         
-        # Adapt the learning rate to the recoverying algorithm employed by analog implementation (if any)
-        if scheme == 5 or scheme == 6:
-            s = int (N / Chi) * (scheme == 5) + int(N / K) * (scheme == 6)
-            A = np.random.randn(s, d) * np.sqrt(1 / d)
-            if s >= d:
-                A_dag = np.linalg.inv(A.T @ A) @ A.T
-                eta = .01
-            else:
-                A_dag = None
+        # # Adapt the learning rate to the recoverying algorithm employed by analog implementation (if any)
+        if scheme == 5:
+            schedule_list, Tx_times = seq_scheduling(G.copy())
+            M = 2 * len(schedule_list)
+            m = int(N / M) 
+            tilde_d = 2 ** 13
+            H = hadamard(tilde_d)
+            H_par = H[:m]
+
+            hat_y_by_devices = [np.zeros((d,)) for i in range(K)] 
+        elif scheme ==6:
+            m = int(N / K) 
+            H = hadamard(tilde_d)
+            H_par = H[:m]
+
+            hat_y_by_devices = [np.zeros((d,)) for i in range(K)] 
+        else:
+            _, from_node_to_color_id = TwoSectionH(G)
+            Chi = max(from_node_to_color_id.values()) + 1
+
+        #     A = np.random.randn(s, d) * np.sqrt(1 / d)
+        #     if s >= d:
+        #         A_dag = np.linalg.inv(A.T @ A) @ A.T
+        #         eta = .01
+        #     else:
+        #         A_dag = None
 
         if decayed_learning:
-            opts = [tf.keras.optimizers.SGD(learning_rate = learning_rate_fn) for i in range(K)]
+            opts = [tf.keras.optimizers.SGD(learning_rate = learning_rate_fn, momentum = 0.9) for i in range(K)]
         else:
-            opts = [tf.keras.optimizers.SGD(learning_rate = 5) for i in range(K)]
-
+            opts = [tf.keras.optimizers.SGD(learning_rate = 5, momentum = 0.9) for i in range(K)]
+        
 
 
         for t, batch_data in enumerate( zip_ds ): # t is the index for the SGD iteration 
             
-            if t // com_interval >= 3000:
+            if t // com_interval >= 2000:
                 break
             # Generate per-iteration channels following Rayleigh fading
             CH_gen = iter( np.random.randn(len(G.edges()),)/np.sqrt(2) + 1j * np.random.randn(len(G.edges()),)/np.sqrt(2) )
@@ -194,7 +214,8 @@ if __name__ == "__main__":
                 for j in G[i]:
                     if j > i:
                         CH[i, j] = np.conjugate(CH[j, i])
-            CG = PL * (np.abs(CH)) ** 2 
+            CH = np.sqrt(PL) * CH
+            CG = np.abs(CH) ** 2 
 
             # Compute the gradients for a list of variables.
             var_lists_by_devices = []
@@ -215,9 +236,13 @@ if __name__ == "__main__":
                                                                                         axis = 0)) for var_list in var_lists_by_devices ] # A list by devices of flattened parameters with shape of (7850,)
             # flattened_theta_by_devices = np.array(flattened_theta_by_devices) # flattened_theta_by_devices is now an NDarray of shape (8, 7850)
             if SCHEME != 1 and not LOCAL:
-                flattened_hat_theta_by_devices = [np.zeros(sum(theta.numpy().size for theta in models[i].trainable_weights)) for i in range(K)] 
+                flattened_hat_theta_by_devices = [np.zeros((d,)) for i in range(K)] 
 
             if not (t % com_interval) and not LOCAL:
+                if decayed_cs:
+                    zeta = cs_rate_fn(t)
+                else:
+                    zeta = initial_zeta
                     ############ vanila DSGD ################
                 if SCHEME == 1:
                     theta_next_by_devices = ds.vanila_DSGD(var_lists_by_devices, W, zeta)
@@ -232,12 +257,11 @@ if __name__ == "__main__":
                     theta_next_by_devices, flattened_hat_theta_by_devices = ds.TDMA_DSGD(G, flattened_theta_by_devices, flattened_hat_theta_by_devices, W, zeta, CG, N, N0, log2_comb_list)
                     ############ A-DSGD based on reverse 2-section hypergraph ################
                 elif SCHEME == 5:
-                    noise =  np.sqrt(N0 / 2) * np.random.randn(K, s) + 1j * np.sqrt(N0 / 2) * np.random.randn(K, s)
-                    theta_next_by_devices, flattened_hat_theta_by_devices = ans.Rx_DSGD(G, CH, W, flattened_theta_by_devices, N, A, A_dag, N0, noise, flattened_hat_theta_by_devices, sparse_ratio, estimator = est, sigma_square = sigma_square, lamda = lamda)
+                    # noise =  np.sqrt(N0 / 2) * np.random.randn(K, s) + 1j * np.sqrt(N0 / 2) * np.random.randn(K, s)
+                    theta_next_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices = ans.Rx_DSGD(G, flattened_theta_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices, W, zeta,  CH, CG, N, schedule_list, Tx_times, H_par)
                     ############ A-DSGD based on TDMA ################
                 elif SCHEME == 6:
-                    noise =  np.sqrt(N0 / 2) * np.random.randn(K, s) + 1j * np.sqrt(N0 / 2) * np.random.randn(K, s)
-                    theta_next_by_devices, flattened_hat_theta_by_devices = ans.Rx_DSGD(G, CH, W, flattened_theta_by_devices, N, A, A_dag, N0, noise, flattened_hat_theta_by_devices, sigma_square, est)
+                    theta_next_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices = ans.TDMA_DSGD(G, flattened_theta_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices, W, zeta, CG, N, H_par)
             else: # local training step
                 theta_next_by_devices = var_lists_by_devices
 
@@ -247,31 +271,47 @@ if __name__ == "__main__":
                 for theta, theta_next in zip(var_list, thetas_next):
                     theta.assign(theta_next)  # theta := tilde_theta
             
-            # Evaluate the current model on the test set every com_interval
             if not (t % com_interval):
-                tr_losses, tst_accs = [], []
-                for i in range(K): # i is the index for the device (node of graph)
-                    model = models[i]
-                    tr_loss = loss_fn(train_labels, model(train_images))
-                    tst_acc = acc_fn(test_labels, model(test_images))
-                    acc_fn.reset_states()
-                    tr_losses.append( tr_loss.numpy() ) 
-                    tst_accs.append( tst_acc.numpy() )
+                # Evaluate the individual model on the test set every com_interval
+                # tr_losses, tst_accs = [], []
+                # for i in range(K): # i is the index for the device (node of graph)
+                #     model = models[i]
+                #     tr_loss = loss_fn(train_labels[ sample_indices[i] ], model(train_images[ sample_indices[i] ]))
+                #     tst_acc = acc_fn(test_labels, model(test_images))
+                #     acc_fn.reset_states()
+                #     tr_losses.append( tr_loss.numpy() ) 
+                #     tst_accs.append( tst_acc.numpy() )
 
+                # Evaluate the average model on the test set every com_interval
+                avg_model = get_model('Avg_model', input_shape=(28, 28), lamda = 0.001)
+                thetas_avg =[sum(weights_by_devices) / K for weights_by_devices in zip(*theta_next_by_devices)]
+                var_list = avg_model.trainable_weights
+                for theta, theta_avg in zip(var_list, thetas_avg):
+                    theta.assign(theta_avg)
+
+                tr_losses = []
+                for i in range(K):
+                    # the following training loss is evaluated over individual data sets using the average model
+                    tr_loss = loss_fn(train_labels [ sample_indices[i] ], avg_model(train_images[ sample_indices[i] ]))
+                    tr_losses.append( tr_loss.numpy() )
+                tst_accs = acc_fn(test_labels, avg_model(test_images)) # the same across all devices over the test data set
+                acc_fn.reset_states()
+
+                # keep track of the training losses by devices (K,) per iteration
                 tr_losseses[n].append(tr_losses)
-                tst_accses[n].append(tst_accs)
-            
-                print("Round{}".format(t // com_interval), "|".join("{:.3f}".format(x)
-                                    for x in tr_losses))
+                # keep track of the test accuracy per iteration
+                tst_accses[n].append(tst_accs.numpy())
+                # print("Round{}".format(t // com_interval), "|".join("{:.3f}".format(x)
+                #                     for x in tr_losses))
                 print("Round{}:{:.3f}".format(t // com_interval, sum(tr_losses) / K ))
 
-                print("Round{}".format(t // com_interval), "|".join("{:.4f}".format(x)
-                                    for x in tst_accs))
-                print("Round{}: {:.4f}".format(t // com_interval, sum(tst_accs) / K ))
+                # print("Round{}".format(t // com_interval), "|".join("{:.4f}".format(x)
+                #                     for x in tst_accs))
+                print("Round{}: {:.4f}".format(t // com_interval, tst_accs))
 
 
 
-        with open('./data/losseses_SCHEME_{}_eta0_{:.2f}_zeta_{:.2f}_10-{:d}.pkl'.format(SCHEME, initial_lr, zeta, n), 'wb') as output1:
+        with open('./data/losseses_SCHEME_{}_eta0_{:.2f}_zeta0_{:.4f}_rho_a_{:.1f}_10-{:d}.pkl'.format(SCHEME, initial_lr, initial_zeta, rho_a_prime, n), 'wb') as output1:
             pickle.dump(tr_losseses, output1)
-        with open('./data/accses_SCHEME_{}_eta0_{:.2f}_zeta_{:.2f}_10-{:d}.pkl'.format(SCHEME, initial_lr, zeta, n), 'wb') as output2:
+        with open('./data/accses_SCHEME_{}_eta0_{:.2f}_zeta0_{:.4f}_rho_a_{:.1f}_10-{:d}.pkl'.format(SCHEME, initial_lr, initial_zeta, rho_a_prime, n), 'wb') as output2:
             pickle.dump(tst_accses, output2)
