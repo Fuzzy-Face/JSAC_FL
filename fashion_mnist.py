@@ -301,11 +301,11 @@ if __name__ == "__main__":
  
         import sys
         if sys.platform == 'win32':
-            path = './data'
+            path = './'
         else:
-            path = '/scratch/users/k1234567/data'
+            path = '/scratch/users/k1818742/'
 
-        with open('{}/losseses_SCHEME_{}_eta0_{:.2f}_zeta0_{:.4f}_rho_a_{:.1f}_star-based_p_{:.2f}_med_N.pkl'.format(path, SCHEME, initial_lr, initial_zeta, rho_a_prime, p), 'wb') as output1:
+        with open('{}data/losseses_SCHEME_{}_eta0_{:.2f}_zeta0_{:.4f}_rho_a_{:.1f}_star-based_p_{:.2f}_med_N.pkl'.format(path, SCHEME, initial_lr, initial_zeta, rho_a_prime, p), 'wb') as output1:
             pickle.dump(tr_losseses, output1)
-        with open('{}/accses_SCHEME_{}_eta0_{:.2f}_zeta0_{:.4f}_rho_a_{:.1f}_star-based_p_{:.2f}_med_N.pkl'.format(path, SCHEME, initial_lr, initial_zeta, rho_a_prime, p), 'wb') as output2:
+        with open('{}data/accses_SCHEME_{}_eta0_{:.2f}_zeta0_{:.4f}_rho_a_{:.1f}_star-based_p_{:.2f}_med_N.pkl'.format(path, SCHEME, initial_lr, initial_zeta, rho_a_prime, p), 'wb') as output2:
             pickle.dump(tst_accses, output2)
