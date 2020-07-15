@@ -29,8 +29,9 @@ def ub_DSGD(G, flattened_theta_by_devices, flattened_hat_theta_by_devices, W, ze
 
 
 
-def proposed_DSGD(G, flattened_theta_by_devices, flattened_hat_theta_by_devices, W, zeta, CG, N, Chi, N0, log2_comb_list):
+def proposed_DSGD(G, flattened_theta_by_devices, flattened_hat_theta_by_devices, W, zeta, CH, N, Chi, N0, log2_comb_list):
     K = len(G.nodes())
+    CG = np.abs(CH) ** 2
     q_array, digits_array = dig_sparse_level(G, CG, N, Chi, N0, log2_comb_list)
     flattened_hat_theta_by_devices = comp_quant_encoding(flattened_theta_by_devices, flattened_hat_theta_by_devices, q_array, digits_array)
 

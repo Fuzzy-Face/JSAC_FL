@@ -62,7 +62,7 @@ def log2_comb(n, k):
 
 def dig_sparse_level(G, CG, N, Chi, N0, log2_comb_list, d = 7850):
     # s =  d / 3  # d\times 1 is the dimension of total number of parameters for each model, i.e., W.shape[0] * W.shape[1] + len(b)
-    barP = .2 / N 
+    barP = .02 / N 
     q_array, b_array = [], []
     for i in range(CG.shape[0]):
         b = 64
@@ -97,8 +97,8 @@ def MyNeighbour(E, ii):
 
 def TwoSectionH(G): # Generate the 2-section of the proposed hypergraph, i.e., H2
     # VertexH = G.nodes()
-    Hyperedge = [ tuple(sorted([i] + [n for n in G.neighbors(i)])) 
-                                    for i in range(G.number_of_nodes()) ] # construct a hypergraph each of whose hyperedge consists of a node and its neighbours
+    Hyperedge = [ tuple(sorted([node] + [n for n in G.neighbors(node)])) 
+                                    for node in G.nodes() ] # construct a hypergraph each of whose hyperedge consists of a node and its neighbours
     Hyperedge = list(set(Hyperedge)) # remove any repeated hyperedges
     H2Edges = [[tuple(sorted(e)) for e in net.complete_graph(he).edges()] for he in Hyperedge] # a list of list of edges of H2, pylint: disable = undefined-variable
     temp = [] # construct the edge set of the H2
@@ -107,6 +107,7 @@ def TwoSectionH(G): # Generate the 2-section of the proposed hypergraph, i.e., H
     H2Edges = list(set(temp)) # remove any repeated edges
 
     H2 = net.Graph() # pylint: disable = undefined-variable
+    H2.add_nodes_from(G.nodes())
     H2.add_edges_from(H2Edges)
     vertex_color_map = net.greedy_color(H2, strategy = 'saturation_largest_first') # vertex coloring H2, pylint: disable = undefined-variable
     # Chi = max(vertex_color_map.values()) + 1 # chromatic number of the present coloring scheme
@@ -287,7 +288,7 @@ def seq_scheduling(G):
     star_schedule_list = [] 
     # key-value pair herein is node (n_b, n_c), where n_b is the #times for which a node transmits as a star center (BC), 
     # and n_c is the #times for which a node transmits as an outer node
-    Tx_times = {node:(0, 0) for node in G.nodes()} 
+    Tx_times = {node:[0, 0] for node in G.nodes()} 
 
     while G:
         _, from_node_to_color_id = TwoSectionH(G)

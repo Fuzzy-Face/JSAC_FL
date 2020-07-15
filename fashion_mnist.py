@@ -94,9 +94,8 @@ if __name__ == "__main__":
 
     com_interval = 5 # Also known as "H" in the SPARQ-SGD paper
     training_times = 1 # There will be training_times of lists each with a different setup of blockages, each of which is of (ComRound, K)
-    p = 0.2 # The probability that one edge is included in the connectivity graph as per the Erdos-Renyi (random) graph
     T = 1
-    BW = 1* 1e4
+    BW = .5 * 1e4
     N0 = 10 ** (-169/10) * 1e-3  # power spectral density of the AWGN noise per channel use
     # N0 = 0
     N = T * BW
@@ -108,21 +107,22 @@ if __name__ == "__main__":
     decayed_learning = True
     mu = 0.002 # assuming eta = (4/mu/a) / (1 + t/a), where mu = 2*lamda
     b = 4/mu # 4/mu
-    a = 1000
+    a = 2000
     initial_lr = b/a
     decay_steps = a
     decay_rate = 1
     learning_rate_fn = keras.optimizers.schedules.InverseTimeDecay(initial_lr,
                                                                     decay_steps, decay_rate)
     decayed_cs = True
-    initial_zeta = 0.1
-    rho_a_prime = 0.3
+    initial_zeta = 0.01
+    rho_a_prime = 50
     cs_rate_fn = lambda t: initial_zeta / (1 + t/rho_a_prime)
 
     loss_fn = keras.losses.SparseCategoricalCrossentropy()
     acc_fn = keras.metrics.SparseCategoricalAccuracy()
 
     seeds = iter(range(1000))
+    p = 0.1 # The probability that one edge is included in the connectivity graph as per the Erdos-Renyi (random) graph
     # losseses and accses are as if of shape (training_times, ComRound, K)
     tr_losseses, tst_accses = [[] for i in range(training_times)] , [[] for i in range(training_times)]
     # # thetases is of shape (training_times, ComRound, K, d)
@@ -133,30 +133,20 @@ if __name__ == "__main__":
         print("The {}th time of training:".format(n))
         alg_connect = 0
         while alg_connect < 1e-4:
-            G = net.erdos_renyi_graph(K, p, seed = next(seeds))
-            # # Construct a complete graph with K nodes
-            # G = net.complete_graph(K)
-            # E = [(i+1, j+1) for i,j in G.edges()]
-
-            # # Construct a ring graph with K nodes
-            # E =  [(1,2), (2,3), (3,4), (4,5), (5,6), (6,7), (7,8), (1,8)]
-            # G = net.Graph()
-            # G.add_edges_from(E)
-
-            # # Construct a star graph with K nodes
-            # E =  [(0,1), (0,2), (0,3), (0,4), (0,5), (0,6), (0,7)]
-            # G = net.Graph()
-            # G.add_edges_from(E)
-            # E = [(i+1, j+1) for i, j in G.edges()]
-            L = np.array(net.laplacian_matrix(G).todense())
+            # Generate a star-based ER graph
+            ER = net.erdos_renyi_graph(K-1, p, seed = next(seeds))
+            ER.add_node(K-1)
+            G = net.star_graph(reversed(range(K)))
+            G.add_edges_from(ER.edges())
+            # Generate an arbitrary ER graph
+            # G = net.erdos_renyi_graph(K, p, seed = next(seeds))
+            L = np.array(net.laplacian_matrix(G, nodelist = range(K)).todense())
             D, _ = np.linalg.eigh(L) # eigenvalues are assumed given in an ascending order
             alg_connect = D[1] 
         # W, _ = solve_graph_weights(K, E)
         alpha = 2 / (D[K-1] + D[1])
         W = np.eye(K) - alpha * L
         # _, Chi = TwoSectionH(G) 
-
-
 
         models = [
             get_model('Device_{}'.format(i), input_shape=(28, 28), lamda = 0.001) for i in range(K)
@@ -177,6 +167,7 @@ if __name__ == "__main__":
             hat_y_by_devices = [np.zeros((d,)) for i in range(K)] 
         elif scheme ==6:
             m = int(N / K) 
+            tilde_d = 2 ** 13
             H = hadamard(tilde_d)
             H_par = H[:m]
 
@@ -214,8 +205,7 @@ if __name__ == "__main__":
                 for j in G[i]:
                     if j > i:
                         CH[i, j] = np.conjugate(CH[j, i])
-            CH = np.sqrt(PL) * CH
-            CG = np.abs(CH) ** 2 
+            CH = np.sqrt(PL) * CH 
 
             # Compute the gradients for a list of variables.
             var_lists_by_devices = []
@@ -251,17 +241,17 @@ if __name__ == "__main__":
                     theta_next_by_devices, flattened_hat_theta_by_devices = ds.ub_DSGD(G, flattened_theta_by_devices, flattened_hat_theta_by_devices, W, zeta)
                     ############ D-DSGD based on 2-section hypergraph (finite channel use) ################
                 elif SCHEME == 3:
-                    theta_next_by_devices, flattened_hat_theta_by_devices = ds.proposed_DSGD(G, flattened_theta_by_devices, flattened_hat_theta_by_devices, W, zeta, CG, N, Chi, N0, log2_comb_list)
+                    theta_next_by_devices, flattened_hat_theta_by_devices = ds.proposed_DSGD(G, flattened_theta_by_devices, flattened_hat_theta_by_devices, W, zeta, CH, N, Chi, N0, log2_comb_list)
                     ############ D-DSGD based on TDMA ################
                 elif SCHEME == 4:
-                    theta_next_by_devices, flattened_hat_theta_by_devices = ds.TDMA_DSGD(G, flattened_theta_by_devices, flattened_hat_theta_by_devices, W, zeta, CG, N, N0, log2_comb_list)
+                    theta_next_by_devices, flattened_hat_theta_by_devices = ds.TDMA_DSGD(G, flattened_theta_by_devices, flattened_hat_theta_by_devices, W, zeta, CH, N, N0, log2_comb_list)
                     ############ A-DSGD based on reverse 2-section hypergraph ################
                 elif SCHEME == 5:
                     # noise =  np.sqrt(N0 / 2) * np.random.randn(K, s) + 1j * np.sqrt(N0 / 2) * np.random.randn(K, s)
-                    theta_next_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices = ans.Rx_DSGD(G, flattened_theta_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices, W, zeta,  CH, CG, N, schedule_list, Tx_times, H_par)
+                    theta_next_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices = ans.proposed_DSGD(G, flattened_theta_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices, W, zeta, CH, N, schedule_list, Tx_times, H_par)
                     ############ A-DSGD based on TDMA ################
                 elif SCHEME == 6:
-                    theta_next_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices = ans.TDMA_DSGD(G, flattened_theta_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices, W, zeta, CG, N, H_par)
+                    theta_next_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices = ans.TDMA_DSGD(G, flattened_theta_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices, W, zeta, CH, N, H_par)
             else: # local training step
                 theta_next_by_devices = var_lists_by_devices
 
@@ -311,7 +301,7 @@ if __name__ == "__main__":
 
 
 
-        with open('./data/losseses_SCHEME_{}_eta0_{:.2f}_zeta0_{:.4f}_rho_a_{:.1f}_10-{:d}.pkl'.format(SCHEME, initial_lr, initial_zeta, rho_a_prime, n), 'wb') as output1:
+        with open('./data/losseses_SCHEME_{}_eta0_{:.2f}_zeta0_{:.4f}_rho_a_{:.1f}_star-based_p_{:.2f}_med_N.pkl'.format(SCHEME, initial_lr, initial_zeta, rho_a_prime, p), 'wb') as output1:
             pickle.dump(tr_losseses, output1)
-        with open('./data/accses_SCHEME_{}_eta0_{:.2f}_zeta0_{:.4f}_rho_a_{:.1f}_10-{:d}.pkl'.format(SCHEME, initial_lr, initial_zeta, rho_a_prime, n), 'wb') as output2:
+        with open('./data/accses_SCHEME_{}_eta0_{:.2f}_zeta0_{:.4f}_rho_a_{:.1f}_star-based_p_{:.2f}_moed_N.pkl'.format(SCHEME, initial_lr, initial_zeta, rho_a_prime, p), 'wb') as output2:
             pickle.dump(tst_accses, output2)
