@@ -100,7 +100,7 @@ if __name__ == "__main__":
     N = T * BW
 
     LOCAL = False
-    scheme = 5
+    scheme = 6
     SCHEME = scheme
     # Generate a learning rate scheduler that returns initial_learning_rate / (1 + decay_rate * t / decay_step)
     decayed_learning = True
@@ -114,7 +114,7 @@ if __name__ == "__main__":
                                                                     decay_steps, decay_rate)
     decayed_cs = True
     initial_zeta = 0.01
-    rho_a_prime = 12.5
+    rho_a_prime = 5.0
     cs_rate_fn = lambda t: initial_zeta / (1 + t/rho_a_prime)
 
     loss_fn = keras.losses.SparseCategoricalCrossentropy()
