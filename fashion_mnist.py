@@ -106,7 +106,7 @@ if __name__ == "__main__":
     decayed_learning = True
     mu = 0.002 # assuming eta = (4/mu/a) / (1 + t/a), where mu = 2*lamda
     b = 4/mu # 4/mu
-    a = 2000
+    a = 1000
     initial_lr = b/a
     decay_steps = a
     decay_rate = 1
@@ -114,7 +114,7 @@ if __name__ == "__main__":
                                                                     decay_steps, decay_rate)
     decayed_cs = True
     initial_zeta = 0.01
-    rho_a_prime = 50
+    rho_a_prime = 1
     cs_rate_fn = lambda t: initial_zeta / (1 + t/rho_a_prime)
 
     loss_fn = keras.losses.SparseCategoricalCrossentropy()
@@ -309,3 +309,5 @@ if __name__ == "__main__":
             pickle.dump(tr_losseses, output1)
         with open('{}data/accses_SCHEME_{}_eta0_{:.2f}_zeta0_{:.4f}_rho_a_{:.1f}_star-based_p_{:.2f}_med_N.pkl'.format(path, SCHEME, initial_lr, initial_zeta, rho_a_prime, p), 'wb') as output2:
             pickle.dump(tst_accses, output2)
+
+    # scp -r k1818742@login.rosalind.kcl.ac.uk:/scratch/users/k1818742/data/*.pkl /home/Helen/MyDocuments/visiting_research@KCL/D2D_DSGD/repo_jv/data/
