@@ -114,7 +114,7 @@ if __name__ == "__main__":
                                                                     decay_steps, decay_rate)
     decayed_cs = True
     initial_zeta = 0.01
-    rho_a_prime = 10
+    rho_a_prime = 12.5
     cs_rate_fn = lambda t: initial_zeta / (1 + t/rho_a_prime)
 
     loss_fn = keras.losses.SparseCategoricalCrossentropy()
