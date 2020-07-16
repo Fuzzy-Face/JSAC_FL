@@ -106,7 +106,7 @@ if __name__ == "__main__":
     decayed_learning = True
     mu = 0.002 # assuming eta = (4/mu/a) / (1 + t/a), where mu = 2*lamda
     b = 4/mu # 4/mu
-    a = 1000
+    a = 2000
     initial_lr = b/a
     decay_steps = a
     decay_rate = 1
@@ -114,7 +114,7 @@ if __name__ == "__main__":
                                                                     decay_steps, decay_rate)
     decayed_cs = True
     initial_zeta = 0.01
-    rho_a_prime = 1
+    rho_a_prime = 10
     cs_rate_fn = lambda t: initial_zeta / (1 + t/rho_a_prime)
 
     loss_fn = keras.losses.SparseCategoricalCrossentropy()
