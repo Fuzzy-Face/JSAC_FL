@@ -29,10 +29,10 @@ def ub_DSGD(G, flattened_theta_by_devices, flattened_hat_theta_by_devices, W, ze
 
 
 
-def proposed_DSGD(G, flattened_theta_by_devices, flattened_hat_theta_by_devices, W, zeta, CH, N, Chi, N0, log2_comb_list):
+def proposed_DSGD(G, flattened_theta_by_devices, flattened_hat_theta_by_devices, W, zeta, CH, N, Chi, P, N0, log2_comb_list):
     K = len(G.nodes())
     CG = np.abs(CH) ** 2
-    q_array, digits_array = dig_sparse_level(G, CG, N, Chi, N0, log2_comb_list)
+    q_array, digits_array = dig_sparse_level(G, CG, N, Chi, P, N0, log2_comb_list)
     flattened_hat_theta_by_devices = comp_quant_encoding(flattened_theta_by_devices, flattened_hat_theta_by_devices, q_array, digits_array)
 
     # flattened_theta_next_by_devices turns out to be a list (device_i's) of aggregate theta_i's after the consensus update)
@@ -48,9 +48,9 @@ def proposed_DSGD(G, flattened_theta_by_devices, flattened_hat_theta_by_devices,
 
 
 
-def TDMA_DSGD(G, flattened_theta_by_devices, flattened_hat_theta_by_devices, W, zeta, CG, N, N0, log2_comb_list):
+def TDMA_DSGD(G, flattened_theta_by_devices, flattened_hat_theta_by_devices, W, zeta, CG, N, P, N0, log2_comb_list):
     K = len(G.nodes())
-    q_array, digits_array = dig_sparse_level(G, CG, N, K, N0, log2_comb_list)
+    q_array, digits_array = dig_sparse_level(G, CG, N, K, P, N0, log2_comb_list)
     flattened_hat_theta_by_devices = comp_quant_encoding(flattened_theta_by_devices, flattened_hat_theta_by_devices, q_array, digits_array)
 
     # flattened_theta_next_by_devices turns out to be a list (device_i's) of aggregate theta_i's after the consensus update)

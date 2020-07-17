@@ -60,9 +60,9 @@ def log2_comb(n, k):
     return log2_comb
 
 
-def dig_sparse_level(G, CG, N, Chi, N0, log2_comb_list, d = 7850):
+def dig_sparse_level(G, CG, N, Chi, P, N0, log2_comb_list, d = 7850):
     # s =  d / 3  # d\times 1 is the dimension of total number of parameters for each model, i.e., W.shape[0] * W.shape[1] + len(b)
-    barP = .02 / N 
+    barP = P / N 
     q_array, b_array = [], []
     for i in range(CG.shape[0]):
         b = 64

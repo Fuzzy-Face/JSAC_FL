@@ -12,26 +12,7 @@ import analog_schemes as ans
 # from scipy.sparse import identity, csr_matrix
 
 
-if __name__ == "__main__":
-
-    print("TensorFlow version: {}".format(tf.__version__)) #pylint: disable = no-member
-    # tf.compat.v1.enable_eager_execution()
-    print("Eager execution: {}".format(tf.executing_eagerly()))
-    np.set_printoptions(suppress=True)
-
-    gpus = tf.config.experimental.list_physical_devices('GPU')
-    if gpus:
-        try:
-            # Currently, memory growth needs to be the same across GPUs
-            for gpu in gpus:
-                tf.config.experimental.set_memory_growth(gpu, True)
-            logical_gpus = tf.config.experimental.list_logical_devices('GPU')
-            print(len(gpus), "Physical GPUs,", len(logical_gpus), "Logical GPUs")
-        except RuntimeError as e:
-            # Memory growth must be set before GPUs have been initialized
-            print(e)
-
-    tf.keras.backend.set_floatx('float64')
+def train( scheme, P, N, initial_lr, initial_cr, rho_a ):
 
     (train_images, train_labels), (test_images,
                                 test_labels) = keras.datasets.fashion_mnist.load_data()
@@ -93,35 +74,33 @@ if __name__ == "__main__":
 
     com_interval = 5 # Also known as "H" in the SPARQ-SGD paper
     training_times = 1 # There will be training_times of lists each with a different setup of blockages, each of which is of (ComRound, K)
-    T = 1
-    BW = .5 * 1e4
+    # T = 1
+    # BW = .5 * 1e4
     N0 = 10 ** (-169/10) * 1e-3  # power spectral density of the AWGN noise per channel use
     # N0 = 0
-    N = T * BW
+    # N = T * BW
 
     LOCAL = False
-    scheme = 6
-    SCHEME = scheme
+    # scheme = 5
     # Generate a learning rate scheduler that returns initial_learning_rate / (1 + decay_rate * t / decay_step)
     decayed_learning = True
     mu = 0.002 # assuming eta = (4/mu/a) / (1 + t/a), where mu = 2*lamda
-    b = 4/mu # 4/mu
-    a = 2000
-    initial_lr = b/a
+    b = 4/mu # 4/mu = 2000
+    a = b/initial_lr
     decay_steps = a
     decay_rate = 1
     learning_rate_fn = keras.optimizers.schedules.InverseTimeDecay(initial_lr,
                                                                     decay_steps, decay_rate)
-    decayed_cs = True
-    initial_zeta = 0.01
-    rho_a_prime = 5.0
-    cs_rate_fn = lambda t: initial_zeta / (1 + t/rho_a_prime)
+    decayed_cr = True
+    initial_cr = 0.01
+    # rho_a = 5.0
+    cs_rate_fn = lambda t: initial_cr / (1 + t/rho_a)
 
     loss_fn = keras.losses.SparseCategoricalCrossentropy()
     acc_fn = keras.metrics.SparseCategoricalAccuracy()
 
     seeds = iter(range(1000))
-    p = 0.1 # The probability that one edge is included in the connectivity graph as per the Erdos-Renyi (random) graph
+    p = 0.2 # The probability that one edge is included in the connectivity graph as per the Erdos-Renyi (random) graph
     # losseses and accses are as if of shape (training_times, ComRound, K)
     tr_losseses, tst_accses = [[] for i in range(training_times)] , [[] for i in range(training_times)]
     # # thetases is of shape (training_times, ComRound, K, d)
@@ -133,12 +112,12 @@ if __name__ == "__main__":
         alg_connect = 0
         while alg_connect < 1e-4:
             # Generate a star-based ER graph
-            ER = net.erdos_renyi_graph(K-1, p, seed = next(seeds))
-            ER.add_node(K-1)
-            G = net.star_graph(reversed(range(K)))
-            G.add_edges_from(ER.edges())
+            # ER = net.erdos_renyi_graph(K-1, p, seed = next(seeds))
+            # ER.add_node(K-1)
+            # G = net.star_graph(reversed(range(K)))
+            # G.add_edges_from(ER.edges())
             # Generate an arbitrary ER graph
-            # G = net.erdos_renyi_graph(K, p, seed = next(seeds))
+            G = net.erdos_renyi_graph(K, p, seed = next(seeds))
             L = np.array(net.laplacian_matrix(G, nodelist = range(K)).todense())
             D, _ = np.linalg.eigh(L) # eigenvalues are assumed given in an ascending order
             alg_connect = D[1] 
@@ -224,33 +203,33 @@ if __name__ == "__main__":
             flattened_theta_by_devices = [ np.ndarray.flatten(np.concatenate((var_list[0].numpy(),var_list[1].numpy().reshape(1,10)), 
                                                                                         axis = 0)) for var_list in var_lists_by_devices ] # A list by devices of flattened parameters with shape of (7850,)
             # flattened_theta_by_devices = np.array(flattened_theta_by_devices) # flattened_theta_by_devices is now an NDarray of shape (8, 7850)
-            if SCHEME != 1 and not LOCAL:
+            if scheme != 1 and not LOCAL:
                 flattened_hat_theta_by_devices = [np.zeros((d,)) for i in range(K)] 
 
             if not (t % com_interval) and not LOCAL:
-                if decayed_cs:
+                if decayed_cr:
                     zeta = cs_rate_fn(t)
                 else:
-                    zeta = initial_zeta
+                    zeta = initial_cr
                     ############ vanila DSGD ################
-                if SCHEME == 1:
+                if scheme == 1:
                     theta_next_by_devices = ds.vanila_DSGD(var_lists_by_devices, W, zeta)
                     ############ D-DSGD upper-bound (indefinite channel use) ################
-                elif SCHEME == 2:
+                elif scheme == 2:
                     theta_next_by_devices, flattened_hat_theta_by_devices = ds.ub_DSGD(G, flattened_theta_by_devices, flattened_hat_theta_by_devices, W, zeta)
                     ############ D-DSGD based on 2-section hypergraph (finite channel use) ################
-                elif SCHEME == 3:
-                    theta_next_by_devices, flattened_hat_theta_by_devices = ds.proposed_DSGD(G, flattened_theta_by_devices, flattened_hat_theta_by_devices, W, zeta, CH, N, Chi, N0, log2_comb_list)
+                elif scheme == 3:
+                    theta_next_by_devices, flattened_hat_theta_by_devices = ds.proposed_DSGD(G, flattened_theta_by_devices, flattened_hat_theta_by_devices, W, zeta, CH, N, Chi, P, N0, log2_comb_list)
                     ############ D-DSGD based on TDMA ################
-                elif SCHEME == 4:
-                    theta_next_by_devices, flattened_hat_theta_by_devices = ds.TDMA_DSGD(G, flattened_theta_by_devices, flattened_hat_theta_by_devices, W, zeta, CH, N, N0, log2_comb_list)
+                elif scheme == 4:
+                    theta_next_by_devices, flattened_hat_theta_by_devices = ds.TDMA_DSGD(G, flattened_theta_by_devices, flattened_hat_theta_by_devices, W, zeta, CH, N, P, N0, log2_comb_list)
                     ############ A-DSGD based on reverse 2-section hypergraph ################
-                elif SCHEME == 5:
+                elif scheme == 5:
                     # noise =  np.sqrt(N0 / 2) * np.random.randn(K, s) + 1j * np.sqrt(N0 / 2) * np.random.randn(K, s)
-                    theta_next_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices = ans.proposed_DSGD(G, flattened_theta_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices, W, zeta, CH, N, schedule_list, Tx_times, H_par)
+                    theta_next_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices = ans.proposed_DSGD(G, flattened_theta_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices, W, zeta, CH, N, schedule_list, Tx_times, H_par, P)
                     ############ A-DSGD based on TDMA ################
-                elif SCHEME == 6:
-                    theta_next_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices = ans.TDMA_DSGD(G, flattened_theta_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices, W, zeta, CH, N, H_par)
+                elif scheme == 6:
+                    theta_next_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices = ans.TDMA_DSGD(G, flattened_theta_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices, W, zeta, CH, N, H_par, P)
             else: # local training step
                 theta_next_by_devices = var_lists_by_devices
 
@@ -305,9 +284,48 @@ if __name__ == "__main__":
         else:
             path = '/scratch/users/k1818742/'
 
-        with open('{}data/losseses_SCHEME_{}_eta0_{:.2f}_zeta0_{:.4f}_rho_a_{:.1f}_star-based_p_{:.2f}_med_N.pkl'.format(path, SCHEME, initial_lr, initial_zeta, rho_a_prime, p), 'wb') as output1:
+        with open('{}data/losseses_SCHEME_{}_P_{:.2f}_N_{:.0f}_eta0_{:.2f}_zeta0_{:.4f}_rho_a_{:.1f}.pkl'.format(path, scheme, P, N, initial_lr, initial_cr, rho_a), 'wb') as output1:
             pickle.dump(tr_losseses, output1)
-        with open('{}data/accses_SCHEME_{}_eta0_{:.2f}_zeta0_{:.4f}_rho_a_{:.1f}_star-based_p_{:.2f}_med_N.pkl'.format(path, SCHEME, initial_lr, initial_zeta, rho_a_prime, p), 'wb') as output2:
+        with open('{}data/accses_SCHEME_{}_P_{:.2f}_N_{:.0f}_eta0_{:.2f}_zeta0_{:.4f}_rho_a_{:.1f}.pkl'.format(path, scheme, P, N, initial_lr, initial_cr, rho_a), 'wb') as output2:
             pickle.dump(tst_accses, output2)
 
     # scp -r k1818742@login.rosalind.kcl.ac.uk:/scratch/users/k1818742/data/*.pkl /home/Helen/MyDocuments/visiting_research@KCL/D2D_DSGD/repo_jv/data/
+
+def main():
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--scheme', type=int, default=5)
+    parser.add_argument('--P', type=float, default=.02)
+    parser.add_argument('--N', type=float, default=1e4)
+    parser.add_argument('--eta0', type=float, default=1.00)
+    parser.add_argument('--zeta0', type=float, default=.0100)
+    parser.add_argument('--rho_a', type=float, default=5.0)
+
+    args = parser.parse_args()
+
+    train( args.scheme, args.P, args.N, args.eta0, args.zeta0, args.rho_a )
+
+
+
+if __name__ == "__main__":
+
+    print("TensorFlow version: {}".format(tf.__version__)) #pylint: disable = no-member
+    # tf.compat.v1.enable_eager_execution()
+    print("Eager execution: {}".format(tf.executing_eagerly()))
+    np.set_printoptions(suppress=True)
+    tf.keras.backend.set_floatx('float64')
+
+    gpus = tf.config.experimental.list_physical_devices('GPU')
+    if gpus:
+        try:
+            # Currently, memory growth needs to be the same across GPUs
+            for gpu in gpus:
+                tf.config.experimental.set_memory_growth(gpu, True)
+            logical_gpus = tf.config.experimental.list_logical_devices('GPU')
+            print(len(gpus), "Physical GPUs,", len(logical_gpus), "Logical GPUs")
+        except RuntimeError as e:
+            # Memory growth must be set before GPUs have been initialized
+            print(e)
+
+    main()
+
