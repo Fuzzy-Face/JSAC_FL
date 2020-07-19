@@ -296,9 +296,9 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--scheme', type=int, default=5)
     parser.add_argument('--P', type=float, default=.02)
-    parser.add_argument('--N', type=float, default=1e4)
+    parser.add_argument('--N', type=float, default=50119)
     parser.add_argument('--eta0', type=float, default=1.00)
-    parser.add_argument('--zeta0', type=float, default=.0100)
+    parser.add_argument('--zeta0', type=float, default=.00100)
     parser.add_argument('--rho_a', type=float, default=5.0)
 
     args = parser.parse_args()
