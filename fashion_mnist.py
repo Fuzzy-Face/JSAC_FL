@@ -284,9 +284,9 @@ def train( scheme, P, N, initial_lr, initial_cr, rho_a ):
         else:
             path = '/scratch/users/k1818742/'
 
-        with open('{}data/losseses_SCHEME_{}_P_{:.2f}_N_{:.0f}_eta0_{:.2f}_zeta0_{:.4f}_rho_a_{:.1f}.pkl'.format(path, scheme, P, N, initial_lr, initial_cr, rho_a), 'wb') as output1:
+        with open('{}data/losseses_SCHEME_{}_P_{:.2f}_N_{:.0f}_eta0_{:.2f}_zeta0_{:.4f}_rho_a_{:.2f}.pkl'.format(path, scheme, P, N, initial_lr, initial_cr, rho_a), 'wb') as output1:
             pickle.dump(tr_losseses, output1)
-        with open('{}data/accses_SCHEME_{}_P_{:.2f}_N_{:.0f}_eta0_{:.2f}_zeta0_{:.4f}_rho_a_{:.1f}.pkl'.format(path, scheme, P, N, initial_lr, initial_cr, rho_a), 'wb') as output2:
+        with open('{}data/accses_SCHEME_{}_P_{:.2f}_N_{:.0f}_eta0_{:.2f}_zeta0_{:.4f}_rho_a_{:.2f}.pkl'.format(path, scheme, P, N, initial_lr, initial_cr, rho_a), 'wb') as output2:
             pickle.dump(tst_accses, output2)
 
     # scp -r k1818742@login.rosalind.kcl.ac.uk:/scratch/users/k1818742/data/*.pkl /home/Helen/MyDocuments/visiting_research@KCL/D2D_DSGD/repo_jv/data/
@@ -298,8 +298,8 @@ def main():
     parser.add_argument('--P', type=float, default=.02)
     parser.add_argument('--N', type=float, default=50119)
     parser.add_argument('--eta0', type=float, default=1.00)
-    parser.add_argument('--zeta0', type=float, default=.00100)
-    parser.add_argument('--rho_a', type=float, default=5.0)
+    parser.add_argument('--zeta0', type=float, default=.0010)
+    parser.add_argument('--rho_a', type=float, default=0.8)
 
     args = parser.parse_args()
 
