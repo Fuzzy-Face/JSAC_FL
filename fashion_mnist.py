@@ -92,7 +92,7 @@ def train( scheme, P, N, initial_lr, initial_cr, rho_a ):
     learning_rate_fn = keras.optimizers.schedules.InverseTimeDecay(initial_lr,
                                                                     decay_steps, decay_rate)
     decayed_cr = True
-    initial_cr = 0.01
+    # initial_cr = 0.01
     # rho_a = 5.0
     cs_rate_fn = lambda t: initial_cr / (1 + t/rho_a)
 
@@ -298,7 +298,7 @@ def main():
     parser.add_argument('--P', type=float, default=.02)
     parser.add_argument('--N', type=float, default=50119)
     parser.add_argument('--eta0', type=float, default=1.00)
-    parser.add_argument('--zeta0', type=float, default=.0010)
+    parser.add_argument('--zeta0', type=float, default=.0100)
     parser.add_argument('--rho_a', type=float, default=0.8)
 
     args = parser.parse_args()
