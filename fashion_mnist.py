@@ -170,7 +170,7 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
 
         for t, batch_data in enumerate( zip_ds ): # t is the index for the SGD iteration 
             
-            if t // com_interval >= 2000:
+            if t // com_interval >= 3000:
                 break
             # Generate per-iteration channels following Rayleigh fading
             CH_gen = iter( np.random.randn(len(G.edges()),)/np.sqrt(2) + 1j * np.random.randn(len(G.edges()),)/np.sqrt(2) )
