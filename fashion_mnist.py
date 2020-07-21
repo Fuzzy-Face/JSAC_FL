@@ -298,7 +298,7 @@ def main():
     parser.add_argument('--P', type=float, default=1.00)
     parser.add_argument('--N', type=float, default=19953)
     parser.add_argument('--rho_a', type=float, default=5000)
-    parser.add_argument('--zeta0', type=float, default=.0010)
+    parser.add_argument('--zeta0', type=float, default=.0100)
     parser.add_argument('--rho_a_prime', type=float, default=2.0)
 
     args = parser.parse_args()
