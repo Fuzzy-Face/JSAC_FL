@@ -12,7 +12,7 @@ import analog_schemes as ans
 # from scipy.sparse import identity, csr_matrix
 
 
-def train( scheme, P, N, initial_lr, initial_cr, rho_a ):
+def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
 
     (train_images, train_labels), (test_images,
                                 test_labels) = keras.datasets.fashion_mnist.load_data()
@@ -86,15 +86,15 @@ def train( scheme, P, N, initial_lr, initial_cr, rho_a ):
     decayed_learning = True
     mu = 0.002 # assuming eta = (4/mu/a) / (1 + t/a), where mu = 2*lamda
     b = 4/mu # 4/mu = 2000
-    a = b/initial_lr
-    decay_steps = a
+    initial_lr = b / rho_a
+    decay_steps = rho_a
     decay_rate = 1
     learning_rate_fn = keras.optimizers.schedules.InverseTimeDecay(initial_lr,
                                                                     decay_steps, decay_rate)
     decayed_cr = True
     # initial_cr = 0.01
     # rho_a = 5.0
-    cs_rate_fn = lambda t: initial_cr / (1 + t/rho_a)
+    cs_rate_fn = lambda t: initial_cr / (1 + t/rho_a_prime)
 
     loss_fn = keras.losses.SparseCategoricalCrossentropy()
     acc_fn = keras.metrics.SparseCategoricalAccuracy()
@@ -284,9 +284,9 @@ def train( scheme, P, N, initial_lr, initial_cr, rho_a ):
         else:
             path = '/scratch/users/k1818742/'
 
-        with open('{}data/losseses_SCHEME_{}_P_{:.2f}_N_{:.0f}_eta0_{:.2f}_zeta0_{:.4f}_rho_a_{:.2f}.pkl'.format(path, scheme, P, N, initial_lr, initial_cr, rho_a), 'wb') as output1:
+        with open('{}data/losseses_SCHEME_{}_P_{:.2f}_N_{:.0f}_rho_a_{:.2f}_zeta0_{:.4f}_rho_a_prime_{:.2f}.pkl'.format(path, scheme, P, N, rho_a, initial_cr, rho_a_prime), 'wb') as output1:
             pickle.dump(tr_losseses, output1)
-        with open('{}data/accses_SCHEME_{}_P_{:.2f}_N_{:.0f}_eta0_{:.2f}_zeta0_{:.4f}_rho_a_{:.2f}.pkl'.format(path, scheme, P, N, initial_lr, initial_cr, rho_a), 'wb') as output2:
+        with open('{}data/accses_SCHEME_{}_P_{:.2f}_N_{:.0f}_rho_a_{:.2f}_zeta0_{:.4f}_rho_a_prime_{:.2f}.pkl'.format(path, scheme, P, N, rho_a, initial_cr, rho_a_prime), 'wb') as output2:
             pickle.dump(tst_accses, output2)
 
     # scp -r k1818742@login.rosalind.kcl.ac.uk:/scratch/users/k1818742/data/*.pkl /home/Helen/MyDocuments/visiting_research@KCL/D2D_DSGD/repo_jv/data/
@@ -295,15 +295,15 @@ def main():
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--scheme', type=int, default=5)
-    parser.add_argument('--P', type=float, default=.02)
-    parser.add_argument('--N', type=float, default=50119)
-    parser.add_argument('--eta0', type=float, default=1.00)
-    parser.add_argument('--zeta0', type=float, default=.0100)
-    parser.add_argument('--rho_a', type=float, default=0.8)
+    parser.add_argument('--P', type=float, default=1.00)
+    parser.add_argument('--N', type=float, default=19953)
+    parser.add_argument('--rho_a', type=float, default=5000)
+    parser.add_argument('--zeta0', type=float, default=.0010)
+    parser.add_argument('--rho_a_prime', type=float, default=2.0)
 
     args = parser.parse_args()
 
-    train( args.scheme, args.P, args.N, args.eta0, args.zeta0, args.rho_a )
+    train( args.scheme, args.P, args.N, args.rho_a, args.zeta0, args.rho_a_prime )
 
 
 
