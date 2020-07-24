@@ -117,13 +117,13 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
             # G = net.star_graph(reversed(range(K)))
             # G.add_edges_from(ER.edges())
 
-            # # Generate an arbitrary ER graph
-            # G = net.erdos_renyi_graph(K, p, seed = next(seeds))
+            # Generate an arbitrary ER graph
+            G = net.erdos_renyi_graph(K, p, seed = next(seeds))
 
-            # Generate a 2-D torus (5-by-4)
-            G = net.grid_2d_graph(5, 4, periodic=True)
-            mapping = { (m,n):4*m+n for m, n in G.nodes()}
-            _ = net.relabel_nodes(G, mapping, copy=False)
+            # # Generate a 2-D torus (5-by-4)
+            # G = net.grid_2d_graph(5, 4, periodic=True)
+            # mapping = { (m,n):4*m+n for m, n in G.nodes()}
+            # _ = net.relabel_nodes(G, mapping, copy=False)
 
             # # Generate a complete graph
             # G = net.complete_graph(K)
@@ -173,7 +173,7 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
         if decayed_learning:
             opts = [tf.keras.optimizers.SGD(learning_rate = learning_rate_fn, momentum = 0.9) for i in range(K)]
         else:
-            opts = [tf.keras.optimizers.SGD(learning_rate = 5, momentum = 0.9) for i in range(K)]
+            opts = [tf.keras.optimizers.SGD(learning_rate = 2, momentum = 0.9) for i in range(K)]
         
 
 
@@ -232,7 +232,7 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
                     ############ D-DSGD based on TDMA ################
                 elif scheme == 4:
                     theta_next_by_devices, flattened_hat_theta_by_devices = ds.TDMA_DSGD(G, flattened_theta_by_devices, flattened_hat_theta_by_devices, W, zeta, CH, N, P, N0, log2_comb_list)
-                    ############ A-DSGD based on reverse 2-section hypergraph ################
+                    ############ A-DSGD based on dynamic coloring of the 2-section hypergraph ################
                 elif scheme == 5:
                     # noise =  np.sqrt(N0 / 2) * np.random.randn(K, s) + 1j * np.sqrt(N0 / 2) * np.random.randn(K, s)
                     theta_next_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices = ans.proposed_DSGD(G, flattened_theta_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices, W, zeta, CH, N, schedule_list, Tx_times, H_par, P)
@@ -305,9 +305,9 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--scheme', type=int, default=5)
     parser.add_argument('--P', type=float, default=0.02)
-    parser.add_argument('--N', type=float, default=19952)
+    parser.add_argument('--N', type=float, default=19953)
     parser.add_argument('--rho_a', type=float, default=2000)
-    parser.add_argument('--zeta0', type=float, default=.0100)
+    parser.add_argument('--zeta0', type=float, default=0.01)
     parser.add_argument('--rho_a_prime', type=float, default=0.8)
 
     args = parser.parse_args()
