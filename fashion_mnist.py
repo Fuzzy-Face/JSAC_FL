@@ -99,8 +99,8 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
     loss_fn = keras.losses.SparseCategoricalCrossentropy()
     acc_fn = keras.metrics.SparseCategoricalAccuracy()
 
-    # seeds = iter(range(1000))
-    # p = 0.2 # The probability that one edge is included in the connectivity graph as per the Erdos-Renyi (random) graph
+    seeds = iter(range(1000))
+    p = 0.2 # The probability that one edge is included in the connectivity graph as per the Erdos-Renyi (random) graph
     # losseses and accses are as if of shape (training_times, ComRound, K)
     tr_losseses, tst_accses = [[] for i in range(training_times)] , [[] for i in range(training_times)]
     # # thetases is of shape (training_times, ComRound, K, d)
