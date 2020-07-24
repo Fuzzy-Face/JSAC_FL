@@ -112,12 +112,12 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
         alg_connect = 0
         while alg_connect < 1e-4:
             # Generate a star-based ER graph
-            # ER = net.erdos_renyi_graph(K-1, p, seed = next(seeds))
-            # ER.add_node(K-1)
-            # G = net.star_graph(reversed(range(K)))
-            # G.add_edges_from(ER.edges())
-            # Generate an arbitrary ER graph
-            G = net.erdos_renyi_graph(K, p, seed = next(seeds))
+            ER = net.erdos_renyi_graph(K-1, p, seed = next(seeds))
+            ER.add_node(K-1)
+            G = net.star_graph(reversed(range(K)))
+            G.add_edges_from(ER.edges())
+            # # Generate an arbitrary ER graph
+            # G = net.erdos_renyi_graph(K, p, seed = next(seeds))
             L = np.array(net.laplacian_matrix(G, nodelist = range(K)).todense())
             D, _ = np.linalg.eigh(L) # eigenvalues are assumed given in an ascending order
             alg_connect = D[1] 
@@ -296,7 +296,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--scheme', type=int, default=5)
     parser.add_argument('--P', type=float, default=0.02)
-    parser.add_argument('--N', type=float, default=19953)
+    parser.add_argument('--N', type=float, default=19952)
     parser.add_argument('--rho_a', type=float, default=2000)
     parser.add_argument('--zeta0', type=float, default=.0100)
     parser.add_argument('--rho_a_prime', type=float, default=0.8)
