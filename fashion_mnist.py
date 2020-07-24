@@ -111,13 +111,20 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
         print("The {}th time of training:".format(n))
         alg_connect = 0
         while alg_connect < 1e-4:
-            # Generate a star-based ER graph
-            ER = net.erdos_renyi_graph(K-1, p, seed = next(seeds))
-            ER.add_node(K-1)
-            G = net.star_graph(reversed(range(K)))
-            G.add_edges_from(ER.edges())
+            # # Generate a star-based ER graph
+            # ER = net.erdos_renyi_graph(K-1, p, seed = next(seeds))
+            # ER.add_node(K-1)
+            # G = net.star_graph(reversed(range(K)))
+            # G.add_edges_from(ER.edges())
+
             # # Generate an arbitrary ER graph
             # G = net.erdos_renyi_graph(K, p, seed = next(seeds))
+
+            # # Generate a 2-D torus (5-by-4)
+            # G = net.grid_2d_graph(5, 4, periodic=True)
+            
+            # Generate a complete graph
+            G = net.complete_graph(K)
             L = np.array(net.laplacian_matrix(G, nodelist = range(K)).todense())
             D, _ = np.linalg.eigh(L) # eigenvalues are assumed given in an ascending order
             alg_connect = D[1] 
