@@ -4,7 +4,8 @@ from utils import MyNeighbour
 #from sklearn.linear_model import Lasso, MultiTaskLasso, OrthogonalMatchingPursuit
 import gc
 
-def proposed_DSGD(G, flattened_theta_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices, W, zeta, CH, N, schedule_list, Tx_times, H_par, P, N0 = 10 ** (-169/10) * 1e-3, d = 7850, tilde_d = 2 ** 13):
+def proposed_DSGD(G, flattened_theta_by_devices, flattened_theta_half_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices, 
+                    W, zeta, CH, N, schedule_list, Tx_times, H_par, P, flag = False, N0 = 10 ** (-169/10) * 1e-3, d = 7850, tilde_d = 2 ** 13):
     K = len(G.nodes())
     CG = np.abs(CH) ** 2
 
@@ -16,7 +17,7 @@ def proposed_DSGD(G, flattened_theta_by_devices, flattened_hat_theta_by_devices,
 
     ########## for flat matrix U (RLC solution) ############
     # A list (device_i's) of model differences that device i prepares to send to its neighbours
-    model_diff = [flattened_theta_by_devices[i] - flattened_hat_theta_by_devices[i]
+    model_diff = [flattened_theta_half_by_devices[i] - flattened_hat_theta_by_devices[i]
                             for i in range(K)] 
     # A list (device_i's) of compressed signal that device i prepares to send to its neighbours before (transmitting) power scaling
     phi = [ A @  np.concatenate((model_diff[i], np.zeros( (tilde_d- d,) )), axis = 0) for i in range(K)] 
@@ -59,25 +60,31 @@ def proposed_DSGD(G, flattened_theta_by_devices, flattened_hat_theta_by_devices,
         hat_y_by_devices[i] += ( m/d * A.T @ np.real(post_y_by_devices[i]) )[:d]
         flattened_hat_theta_by_devices[i] += ( m/d * A.T @ phi[i] )[:d]
 
-    RLC_error = [ np.linalg.norm((m/d * A.T @ np.real(post_y_by_devices[i]))[:d] - sum( W[i,j] * model_diff[j] for j in G[i] ), 2)**2 / np. linalg.norm(sum( W[i,j] * model_diff[j] for j in G[i] ), 2)**2 
-                    for i in range(K) ]
-    
-    print("Normalized MSE(dB):", "|".join("{:.2f}".format(10 * np.log10(RLC_error[i])) for i in range(K)))
+    # RLC_error = [ np.linalg.norm((m/d * A.T @ np.real(post_y_by_devices[i]))[:d] - sum( W[i,j] * model_diff[j] for j in G[i] ), 2)**2 / np. linalg.norm(sum( W[i,j] * model_diff[j] for j in G[i] ), 2)**2 
+    #                 for i in range(K) ]
+    # print("Normalized MSE(dB):", "|".join("{:.2f}".format(10 * np.log10(RLC_error[i])) for i in range(K)))
 
+    if flag:
+        flattened_avg_theta = sum(flattened_theta_by_devices) / K
+        cons_error = sum([ np.linalg.norm(flattened_avg_theta - flattened_theta_by_devices[i], 2)**2 for i in range(K) ]) / K
+        comp_error = sum([ np.linalg.norm(flattened_hat_theta_by_devices[i]- flattened_theta_by_devices[i], 2)**2 for i in range(K) ]) / K
+    
     # flattened_theta_next_by_devices turns out to be a list (device_i's) of aggregate theta_i's after the consensus update)
-    flattened_theta_next_by_devices = [ flattened_theta_by_devices[i] + 
+    flattened_theta_next_by_devices = [ flattened_theta_half_by_devices[i] + 
                                                 zeta * ( W[i,i]*flattened_hat_theta_by_devices[i] + hat_y_by_devices[i] -
                                                         flattened_hat_theta_by_devices[i] ) 
                                                     for i in range(K) ]
     # Unflatten the theta_next's in a list (device_i's) of [theta_{i}^{W}, theta_{i}^{b}]
-    theta_next_by_devices = [[flattened_theta_next_by_devices[i][:7840].reshape((784,10)),  
-                                flattened_theta_next_by_devices[i][7840:]] for i in range(K)] 
+    theta_next_by_devices = [ [ flattened_theta_next_by_devices[i][:7840].reshape((784,10)),  
+                                flattened_theta_next_by_devices[i][7840:] ] for i in range(K) ] 
+    if flag:
+        return theta_next_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices, cons_error, comp_error
+    else:
+        return theta_next_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices
 
-    return theta_next_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices 
 
 
-
-def TDMA_DSGD(G, flattened_theta_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices, W, zeta, CH, N, H_par, P, N0 = 10 ** (-169/10) * 1e-3, d = 7850, tilde_d = 2 ** 13):
+def TDMA_DSGD(G, flattened_theta_half_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices, W, zeta, CH, N, H_par, P, N0 = 10 ** (-169/10) * 1e-3, d = 7850, tilde_d = 2 ** 13):
     K = len(G.nodes())
     CG = np.abs(CH) ** 2
 
@@ -89,7 +96,7 @@ def TDMA_DSGD(G, flattened_theta_by_devices, flattened_hat_theta_by_devices, hat
 
     ########## for flat matrix U (RLC solution) ############
     # A list (device_i's) of model differences that device i prepares to send to its neighbours
-    model_diff = [flattened_theta_by_devices[i] - flattened_hat_theta_by_devices[i]
+    model_diff = [flattened_theta_half_by_devices[i] - flattened_hat_theta_by_devices[i]
                             for i in range(K)] 
     # A list (device_i's) of compressed signal that device i prepares to send to its neighbours before (transmitting) power scaling
     phi = [ A @  np.concatenate((model_diff[i], np.zeros( (tilde_d- d,) )), axis = 0) for i in range(K)] 
@@ -117,7 +124,7 @@ def TDMA_DSGD(G, flattened_theta_by_devices, flattened_hat_theta_by_devices, hat
     # print("Normalized MSE(dB):", "|".join("{:.2f}".format(10 * np.log10(RLC_error[i])) for i in range(K)))
 
     # flattened_theta_next_by_devices turns out to be a list (device_i's) of aggregate theta_i's after the consensus update)
-    flattened_theta_next_by_devices = [ flattened_theta_by_devices[i] + 
+    flattened_theta_next_by_devices = [ flattened_theta_half_by_devices[i] + 
                                                 zeta * ( W[i,i]*flattened_hat_theta_by_devices[i] + hat_y_by_devices[i] -
                                                         flattened_hat_theta_by_devices[i] ) 
                                                     for i in range(K) ]

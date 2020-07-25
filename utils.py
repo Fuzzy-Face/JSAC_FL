@@ -46,12 +46,19 @@ def solve_graph_weights( K, E = None ):
 
 
 
-def get_model( name, input_shape, lamda = 1e-6 ):
-    return keras.Sequential( [
-        Flatten( input_shape = input_shape ),
-        Dense( 10, activation = 'softmax', kernel_regularizer = keras.regularizers.l2( lamda ) ),
-        ], name = name,
-        )
+def get_model( name, input_shape, lamda = 1e-6, flag=True ):
+    if flag:
+        return keras.Sequential( [
+            Flatten( input_shape = input_shape ),
+            Dense( 10, kernel_initializer = 'zeros', activation = 'softmax', kernel_regularizer = keras.regularizers.l2( lamda ) ),
+            ], name = name,
+            )
+    else:
+        return keras.Sequential( [
+            Flatten( input_shape = input_shape ),
+            Dense( 10, activation = 'softmax', kernel_regularizer = keras.regularizers.l2( lamda ) ),
+            ], name = name,
+            )
 
 def log2_comb(n, k):
     combN = range(n, n-k, -1)
