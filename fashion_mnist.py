@@ -157,7 +157,7 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
                 H_par = H[:m] 
                 # Initialize the \theta_i^{(t)}'s as [\theta_{i,W}=np.zeros((784,10)), \theta_{i,b}=np.zeros((10,))]
                 # for the purpose of keeping track of the consensus and the compression error
-                theta_next_by_devices = [ [tf.zeros((784,10)), tf.zeros((10,))] for i in range(K)]  
+                theta_next_by_devices = [ [np.zeros((784,10)), np.zeros((10,))] for i in range(K)]  
             elif scheme ==6:
                 m = int(N / K) 
                 tilde_d = 2 ** 13
@@ -205,9 +205,15 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
             
             if scheme == 5 or scheme == 6 or scheme == 7:
             # Keep track of the original theta_i^{(t)}'s at the beginning of the iteration t
-                flattened_theta_by_devices = [ np.ndarray.flatten(np.concatenate(( theta_next[0].numpy(),
-                                                                                    theta_next[1].numpy().reshape(1,10) ), axis = 0))
-                                                                            for theta_next in theta_next_by_devices ] 
+                if isinstance(theta_next_by_devices[0][0], tf.Variable):
+                    flattened_theta_by_devices = [ np.ndarray.flatten(np.concatenate(( theta_next[0].numpy(),
+                                                                                        theta_next[1].numpy().reshape(1,10) ), axis = 0))
+                                                                                for theta_next in theta_next_by_devices ] 
+                else:
+                    flattened_theta_by_devices = [ np.ndarray.flatten(np.concatenate(( theta_next[0],
+                                                                    theta_next[1].reshape(1,10) ), axis = 0))
+                                                            for theta_next in theta_next_by_devices ] 
+
             # Keep track of \theta_i^{(t+1/2)}'s after the local model updates
             flattened_theta_half_by_devices = []
             # Keep track of the model paramters in tensors as [\theta_{i,W}, \theta_{i,b}]
@@ -328,9 +334,9 @@ def main():
     parser.add_argument('--scheme', type=int, default=5)
     parser.add_argument('--P', type=float, default=0.02)
     parser.add_argument('--N', type=float, default=7943)
-    parser.add_argument('--rho_a', type=float, default=2000)
+    parser.add_argument('--rho_a', type=float, default=5000)
     parser.add_argument('--zeta0', type=float, default=0.001)
-    parser.add_argument('--rho_a_prime', type=float, default=2000.00)
+    parser.add_argument('--rho_a_prime', type=float, default=5000.00)
 
     args = parser.parse_args()
 
