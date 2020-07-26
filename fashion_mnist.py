@@ -113,19 +113,19 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
         print("The {}th time of training:".format(n))
         alg_connect = 0
         while alg_connect < 1e-4:
-            # Generate a star-based ER graph
-            ER = net.erdos_renyi_graph(K-1, p, seed = next(seeds))
-            ER.add_node(K-1)
-            G = net.star_graph(reversed(range(K)))
-            G.add_edges_from(ER.edges())
+            # # Generate a star-based ER graph
+            # ER = net.erdos_renyi_graph(K-1, p, seed = next(seeds))
+            # ER.add_node(K-1)
+            # G = net.star_graph(reversed(range(K)))
+            # G.add_edges_from(ER.edges())
 
             # # Generate an arbitrary ER graph
             # G = net.erdos_renyi_graph(K, p, seed = next(seeds))
 
-            # # Generate a 2-D torus (5-by-4)
-            # G = net.grid_2d_graph(5, 4, periodic=True)
-            # mapping = { (m,n):4*m+n for m, n in G.nodes()}
-            # _ = net.relabel_nodes(G, mapping, copy=False)
+            # Generate a 2-D torus (5-by-4)
+            G = net.grid_2d_graph(5, 4, periodic=True)
+            mapping = { (m,n):4*m+n for m, n in G.nodes()}
+            _ = net.relabel_nodes(G, mapping, copy=False)
 
             # # Generate a complete graph
             # G = net.complete_graph(K)
@@ -139,7 +139,7 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
         # _, Chi = TwoSectionH(G) 
 
         models = [
-            get_model('Device_{}'.format(i), (28, 28), lamda = 0.001) for i in range(K)
+            get_model('Device_{}'.format(i), (28, 28), lamda = 0.001, flag = False) for i in range(K)
         ]
         d = int(sum(theta.numpy().size for theta in models[0].trainable_weights))
 
@@ -288,7 +288,7 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
                 #     tst_accs.append( tst_acc.numpy() )
 
                 # Evaluate the average model on the test set every com_interval
-                avg_model = get_model('Avg_model', (28, 28), lamda = 0.001)
+                avg_model = get_model('Avg_model', (28, 28), lamda = 0.001, flag = False)
                 thetas_avg =[sum(weights_by_devices) / K for weights_by_devices in zip(*theta_next_by_devices)]
                 var_list = avg_model.trainable_weights
                 for theta, theta_avg in zip(var_list, thetas_avg):
@@ -321,9 +321,9 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
         else:
             path = '/scratch/users/k1818742/'
 
-        with open('{}data/losseses_SCHEME_{}_P_{:.2f}_N_{:.0f}_rho_a_{:.2f}_zeta0_{:.4f}_rho_a_prime_{:.2f}_star.pkl'.format(path, scheme, P, N, rho_a, initial_cr, rho_a_prime), 'wb') as output1:
+        with open('{}data/losseses_SCHEME_{}_P_{:.2f}_N_{:.0f}_rho_a_{:.2f}_zeta0_{:.4f}_rho_a_prime_{:.2f}_2D-torus_random_ini.pkl'.format(path, scheme, P, N, rho_a, initial_cr, rho_a_prime), 'wb') as output1:
             pickle.dump(tr_losseses, output1)
-        with open('{}data/accses_SCHEME_{}_P_{:.2f}_N_{:.0f}_rho_a_{:.2f}_zeta0_{:.4f}_rho_a_prime_{:.2f}_star.pkl'.format(path, scheme, P, N, rho_a, initial_cr, rho_a_prime), 'wb') as output2:
+        with open('{}data/accses_SCHEME_{}_P_{:.2f}_N_{:.0f}_rho_a_{:.2f}_zeta0_{:.4f}_rho_a_prime_{:.2f}_2D-torus_random_ini.pkl'.format(path, scheme, P, N, rho_a, initial_cr, rho_a_prime), 'wb') as output2:
             pickle.dump(tst_accses, output2)
 
     # scp -r k1818742@login.rosalind.kcl.ac.uk:/scratch/users/k1818742/data/*.pkl /home/Helen/MyDocuments/visiting_research@KCL/D2D_DSGD/repo_jv/data/
