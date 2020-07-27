@@ -116,11 +116,11 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
             # # Generate a star-based ER graph
             # ER = net.erdos_renyi_graph(K-1, p, seed = next(seeds))
             # ER.add_node(K-1)
-            G = net.star_graph(reversed(range(K)))
+            # G = net.star_graph(reversed(range(K)))
             # G.add_edges_from(ER.edges())
 
-            # # Generate an arbitrary ER graph
-            # G = net.erdos_renyi_graph(K, p, seed = next(seeds))
+            # Generate an arbitrary ER graph
+            G = net.erdos_renyi_graph(K, p, seed = next(seeds))
 
             # # Generate a 2-D torus (5-by-4)
             # G = net.grid_2d_graph(5, 4, periodic=True)
@@ -317,13 +317,13 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
  
         import sys
         if sys.platform == 'win32':
-            path = './'
+            path = './data/pair-wise/'
         else:
-            path = '/scratch/users/k1818742/'
+            path = '/scratch/users/k1818742/data/'
 
-        with open('{}data/losseses_SCHEME_{}_P_{:.2f}_N_{:.0f}_rho_a_{:.2f}_zeta0_{:.4f}_rho_a_prime_{:.2f}_pure_star.pkl'.format(path, scheme, P, N, rho_a, initial_cr, rho_a_prime), 'wb') as output1:
+        with open('{}losseses_SCHEME_{}_P_{:.2f}_N_{:.0f}_rho_a_{:.2f}_zeta0_{:.4f}_rho_a_prime_{:.2f}.pkl'.format(path, scheme, P, N, rho_a, initial_cr, rho_a_prime), 'wb') as output1:
             pickle.dump(tr_losseses, output1)
-        with open('{}data/accses_SCHEME_{}_P_{:.2f}_N_{:.0f}_rho_a_{:.2f}_zeta0_{:.4f}_rho_a_prime_{:.2f}_pure_star.pkl'.format(path, scheme, P, N, rho_a, initial_cr, rho_a_prime), 'wb') as output2:
+        with open('{}accses_SCHEME_{}_P_{:.2f}_N_{:.0f}_rho_a_{:.2f}_zeta0_{:.4f}_rho_a_prime_{:.2f}.pkl'.format(path, scheme, P, N, rho_a, initial_cr, rho_a_prime), 'wb') as output2:
             pickle.dump(tst_accses, output2)
 
     # scp -r k1818742@login.rosalind.kcl.ac.uk:/scratch/users/k1818742/data/*.pkl /home/Helen/MyDocuments/visiting_research@KCL/D2D_DSGD/repo_jv/data/
@@ -333,7 +333,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--scheme', type=int, default=5)
     parser.add_argument('--P', type=float, default=0.02)
-    parser.add_argument('--N', type=float, default=1588)
+    parser.add_argument('--N', type=float, default=7943)
     parser.add_argument('--rho_a', type=float, default=2000)
     parser.add_argument('--zeta0', type=float, default=0.01)
     parser.add_argument('--rho_a_prime', type=float, default=10000.00)
