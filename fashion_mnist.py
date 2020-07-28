@@ -334,9 +334,9 @@ def main():
     parser.add_argument('--scheme', type=int, default=5)
     parser.add_argument('--P', type=float, default=0.02)
     parser.add_argument('--N', type=float, default=7943)
-    parser.add_argument('--rho_a', type=float, default=2000)
+    parser.add_argument('--rho_a', type=float, default=500)
     parser.add_argument('--zeta0', type=float, default=0.01)
-    parser.add_argument('--rho_a_prime', type=float, default=10000.00)
+    parser.add_argument('--rho_a_prime', type=float, default=10000)
 
     args = parser.parse_args()
 
