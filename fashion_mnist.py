@@ -91,7 +91,7 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
     decay_rate = 1
     learning_rate_fn = keras.optimizers.schedules.InverseTimeDecay(initial_lr,
                                                                     decay_steps, decay_rate)
-    decayed_cr = True
+    decayed_cr = False
     # initial_cr = 0.01
     # rho_a = 5.0
     cs_rate_fn = lambda t: initial_cr / (1 + t/rho_a_prime)
@@ -253,7 +253,7 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
                 ############ A-DSGD based on dynamic coloring of the 2-section hypergraph ################
                 elif scheme == 5:
                     # noise =  np.sqrt(N0 / 2) * np.random.randn(K, s) + 1j * np.sqrt(N0 / 2) * np.random.randn(K, s)
-                    theta_next_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices = ans.proposed_DSGD(G, flattened_theta_by_devices, flattened_theta_half_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices, W, zeta, CH, N, schedule_list, Tx_times, H_par, P)
+                    theta_next_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices = ans.proposed_DSGD(G, flattened_theta_by_devices, flattened_theta_half_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices, W, zeta, CH, N, schedule_list, Tx_times, H_par, P, N0 = 0)
                 ############ A-DSGD based on TDMA ################
                 elif scheme == 6:
                     theta_next_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices = ans.TDMA_DSGD(G, flattened_theta_half_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices, W, zeta, CH, N, H_par, P)

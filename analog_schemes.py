@@ -4,6 +4,7 @@ from utils import MyNeighbour
 #from sklearn.linear_model import Lasso, MultiTaskLasso, OrthogonalMatchingPursuit
 import gc
 
+# N0 = 10 ** (-169/10) * 1e-3
 def proposed_DSGD(G, flattened_theta_by_devices, flattened_theta_half_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices, 
                     W, zeta, CH, N, schedule_list, Tx_times, H_par, P, flag = False, N0 = 10 ** (-169/10) * 1e-3, d = 7850, tilde_d = 2 ** 13):
     K = len(G.nodes())
