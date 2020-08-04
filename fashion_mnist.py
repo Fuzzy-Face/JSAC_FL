@@ -84,7 +84,7 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
     LOCAL = False
     # scheme = 5
     # Generate a learning rate scheduler that returns initial_learning_rate / (1 + decay_rate * t / decay_step)
-    decayed_learning = False
+    decayed_learning = True
     mu = 0.002 # assuming eta = (4/mu/a) / (1 + t/a), where mu = 2*lamda
     b = 4/mu # 4/mu = 2000
     initial_lr = b / rho_a
@@ -92,7 +92,7 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
     decay_rate = 1
     learning_rate_fn = keras.optimizers.schedules.InverseTimeDecay(initial_lr,
                                                                     decay_steps, decay_rate)
-    decayed_cr = True
+    decayed_cr = False
     # initial_cr = 0.01
     # rho_a = 5.0
     cs_rate_fn = lambda t: initial_cr / (1 + t/rho_a_prime)
