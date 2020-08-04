@@ -41,10 +41,15 @@ def proposed_DSGD(G, flattened_theta_by_devices, flattened_theta_half_by_devices
 
     # (1st step) Process the received signal, by, e.g., re-scaling for decoding
     post_y_by_devices = []
+    # Keep record of a list (device_i's) of N_0/\gamma_i(t) = \sum_{s=1}^{#Rx_times[node]}N_0/\gamma_i^{(s)}(t),
+    # which can be cumsum across time to obtain the list (device_i's) of accumulated error caused by AWGN
+    noise_error_by_devices = []
     for node in range(K):
         post_y = sum( W[node,j] * phi[j] for j in G[node] ).astype(complex)
+        noise_error = 0
         if node in gamma:
             post_y += next(noise[node]) / np.sqrt(gamma[node])
+            noise_error += m * N0 / gamma[node]
             for schedule in schedule_list:
                 AirCompSetof_node = schedule.get(node)
                 if AirCompSetof_node:
@@ -54,7 +59,9 @@ def proposed_DSGD(G, flattened_theta_by_devices, flattened_theta_half_by_devices
         for i in G[node]:
             if i not in AirCompSetof_node:
                 post_y += W[node,i] * next(noise[node]) / ( CH[i,node] * np.sqrt(alpha[i]) )
+                noise_error += W[node,i]**2 * m * N0 / (np.abs(CH[i,node])**2 * alpha[i])
         post_y_by_devices.append(post_y)
+        noise_error_by_devices.append(noise_error)
 
     # (2nd step) Process the rescaled signal by m/d * A.T @ real(post_y)            
     for i in range(K):
@@ -69,6 +76,7 @@ def proposed_DSGD(G, flattened_theta_by_devices, flattened_theta_half_by_devices
         flattened_avg_theta = sum(flattened_theta_by_devices) / K
         cons_error = sum([ np.linalg.norm(flattened_avg_theta - flattened_theta_by_devices[i], 2)**2 for i in range(K) ]) / K
         comp_error = sum([ np.linalg.norm(flattened_hat_theta_by_devices[i]- flattened_theta_by_devices[i], 2)**2 for i in range(K) ]) / K
+
     
     # flattened_theta_next_by_devices turns out to be a list (device_i's) of aggregate theta_i's after the consensus update)
     flattened_theta_next_by_devices = [ flattened_theta_half_by_devices[i] + 
@@ -79,7 +87,7 @@ def proposed_DSGD(G, flattened_theta_by_devices, flattened_theta_half_by_devices
     theta_next_by_devices = [ [ flattened_theta_next_by_devices[i][:7840].reshape((784,10)),  
                                 flattened_theta_next_by_devices[i][7840:] ] for i in range(K) ] 
     if flag:
-        return theta_next_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices, cons_error, comp_error
+        return theta_next_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices, cons_error, comp_error, noise_error_by_devices
     else:
         return theta_next_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices
 

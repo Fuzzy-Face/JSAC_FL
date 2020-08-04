@@ -4,6 +4,7 @@ from tensorflow import keras
 from tensorflow.keras.layers import Dense, Flatten #pylint: disable = import-error
 import matplotlib.pyplot as plt
 import pickle
+import pandas as pd
 import networkx as net
 from utils import solve_graph_weights, get_model, calc_grad, log2_comb, TwoSectionH, solve_num_per_class, seq_scheduling
 from scipy.linalg import hadamard
@@ -83,7 +84,7 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
     LOCAL = False
     # scheme = 5
     # Generate a learning rate scheduler that returns initial_learning_rate / (1 + decay_rate * t / decay_step)
-    decayed_learning = True
+    decayed_learning = False
     mu = 0.002 # assuming eta = (4/mu/a) / (1 + t/a), where mu = 2*lamda
     b = 4/mu # 4/mu = 2000
     initial_lr = b / rho_a
@@ -101,12 +102,14 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
 
     seeds = iter(range(1000))
     p = 0.2 # The probability that one edge is included in the connectivity graph as per the Erdos-Renyi (random) graph
-    # losseses and accses are as if of shape (training_times, ComRound, K)
+    # losseses and accses are of shape (training_times, ComRound, K)
     tr_losseses, tst_accses = [[] for i in range(training_times)] , [[] for i in range(training_times)]
     # # thetases is of shape (training_times, ComRound, K, d)
     # thetases = [[] for i in range(training_times)]
     if scheme == 7:
-        cons_erros, comp_errors = [[] for i in range(training_times)], [[] for i in range(training_times)]
+        # cons_errors/comp_errors is of shape (training_times, ComRound, 1)
+        # noise_errors is of shape (training_times, ComRound, 1)
+        cons_errors, comp_errors, noise_errors = [[] for i in range(training_times)], [[] for i in range(training_times)], [[] for i in range(training_times)] 
 
     for n in range(training_times): # n is the index for the times of training
         # Generate a random graph model suffering from blockages under Erdos Renyi Model
@@ -167,7 +170,7 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
             if scheme == 5 or scheme == 6 or scheme == 7:
                 # Initialize the \hat{y}_i^{(t)}'s as zeros
                 hat_y_by_devices = [np.zeros((d,)) for i in range(K)] 
-        
+
             if scheme == 3:
                 _, from_node_to_color_id = TwoSectionH(G)
                 Chi = max(from_node_to_color_id.values()) + 1
@@ -259,12 +262,16 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
                     theta_next_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices = ans.TDMA_DSGD(G, flattened_theta_half_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices, W, zeta, CH, N, H_par, P)
                 ############ A-DSGD keeping track of the error ################
                 elif scheme == 7:
-                    theta_next_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices, cons_error, comp_error = ans.proposed_DSGD(G, flattened_theta_by_devices, flattened_theta_half_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices, W, zeta, CH, N, schedule_list, Tx_times, H_par, P, flag = True)
-                    cons_erros[n].append(cons_error)
+                    theta_next_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices, cons_error, comp_error, noise_error_by_devices = ans.proposed_DSGD(G, flattened_theta_by_devices, flattened_theta_half_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices, W, zeta, CH, N, schedule_list, Tx_times, H_par, P, flag = True)
+                    cons_errors[n].append(cons_error)
                     comp_errors[n].append(comp_error)
+                    noise_errors[n].append(noise_error_by_devices)
 
                     print("Round{}: consensus error {:.2f}".format(t // com_interval, cons_error))
                     print("Round{}: compression error {:.2f}".format(t // com_interval, comp_error))
+                    df = pd.DataFrame(noise_errors[n], columns = ['Device_{}'.format(i + 1) for i in range(K)] )
+                    acc_noise_error = zeta **2 * (m/d) * (2 - m/d) * (df.sum().sum())
+                    print("Round{}: AWGN error {:.2f}".format(t // com_interval, acc_noise_error))
             else: # local training step
                 theta_next_by_devices = var_lists_by_devices
 
@@ -321,21 +328,29 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
         else:
             path = '/scratch/users/k1818742/data/'
 
-        with open('{}losseses_SCHEME_{}_P_{:.2f}_N_{:.0f}_rho_a_{:.2f}_zeta0_{:.4f}_rho_a_prime_{:.2f}.pkl'.format(path, scheme, P, N, rho_a, initial_cr, rho_a_prime), 'wb') as output1:
+        with open('{}losseses_SCHEME_{}_P_{:.4f}_N_{:.0f}_rho_a_{:.2f}_zeta0_{:.4f}_rho_a_prime_{:.2f}.pkl'.format(path, scheme, P, N, rho_a, initial_cr, rho_a_prime), 'wb') as output1:
             pickle.dump(tr_losseses, output1)
-        with open('{}accses_SCHEME_{}_P_{:.2f}_N_{:.0f}_rho_a_{:.2f}_zeta0_{:.4f}_rho_a_prime_{:.2f}.pkl'.format(path, scheme, P, N, rho_a, initial_cr, rho_a_prime), 'wb') as output2:
+        with open('{}accses_SCHEME_{}_P_{:.4f}_N_{:.0f}_rho_a_{:.2f}_zeta0_{:.4f}_rho_a_prime_{:.2f}.pkl'.format(path, scheme, P, N, rho_a, initial_cr, rho_a_prime), 'wb') as output2:
             pickle.dump(tst_accses, output2)
+        
+        if scheme == 7:
+            with open('{}cons_e_SCHEME_{}_P_{:.4f}_N_{:.0f}_rho_a_{:.2f}_zeta0_{:.4f}_rho_a_prime_{:.2f}.pkl'.format(path, scheme, P, N, rho_a, initial_cr, rho_a_prime), 'wb') as output3:
+                pickle.dump(cons_errors, output3)
+            with open('{}comp_e_SCHEME_{}_P_{:.4f}_N_{:.0f}_rho_a_{:.2f}_zeta0_{:.4f}_rho_a_prime_{:.2f}.pkl'.format(path, scheme, P, N, rho_a, initial_cr, rho_a_prime), 'wb') as output4:
+                pickle.dump(comp_errors, output4)
+            with open('{}noise_e_SCHEME_{}_P_{:.4f}_N_{:.0f}_rho_a_{:.2f}_zeta0_{:.4f}_rho_a_prime_{:.2f}.pkl'.format(path, scheme, P, N, rho_a, initial_cr, rho_a_prime), 'wb') as output5:
+                pickle.dump(noise_errors, output5)
 
     # scp -r k1818742@login.rosalind.kcl.ac.uk:/scratch/users/k1818742/data/*.pkl /home/Helen/MyDocuments/visiting_research@KCL/D2D_DSGD/repo_jv/data/
 
 def main():
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--scheme', type=int, default=5)
+    parser.add_argument('--scheme', type=int, default=7)
     parser.add_argument('--P', type=float, default=0.02)
     parser.add_argument('--N', type=float, default=7943)
     parser.add_argument('--rho_a', type=float, default=500)
-    parser.add_argument('--zeta0', type=float, default=0.01)
+    parser.add_argument('--zeta0', type=float, default=0.1)
     parser.add_argument('--rho_a_prime', type=float, default=1000)
 
     args = parser.parse_args()
