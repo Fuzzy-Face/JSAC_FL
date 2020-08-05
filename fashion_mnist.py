@@ -92,7 +92,7 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
     decay_rate = 1
     learning_rate_fn = keras.optimizers.schedules.InverseTimeDecay(initial_lr,
                                                                     decay_steps, decay_rate)
-    decayed_cr = False
+    decayed_cr = True
     # initial_cr = 0.01
     # rho_a = 5.0
     cs_rate_fn = lambda t: initial_cr / (1 + t/rho_a_prime)
@@ -270,6 +270,7 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
                     print("Round{}: consensus error {:.2f}".format(t // com_interval, cons_error))
                     print("Round{}: compression error {:.2f}".format(t // com_interval, comp_error))
                     df = pd.DataFrame(noise_errors[n], columns = ['Device_{}'.format(i + 1) for i in range(K)] )
+                    # !!! Note that one m has already been multiplied by N0 when calculating noise_error_by_devices
                     acc_noise_error = zeta **2 * (m/d) * (2 - m/d) * (df.sum().sum())
                     print("Round{}: AWGN error {:.2f}".format(t // com_interval, acc_noise_error))
             else: # local training step
@@ -347,11 +348,11 @@ def main():
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--scheme', type=int, default=7)
-    parser.add_argument('--P', type=float, default=0.02)
+    parser.add_argument('--P', type=float, default=0.0002)
     parser.add_argument('--N', type=float, default=7943)
     parser.add_argument('--rho_a', type=float, default=500)
-    parser.add_argument('--zeta0', type=float, default=0.1)
-    parser.add_argument('--rho_a_prime', type=float, default=1000)
+    parser.add_argument('--zeta0', type=float, default=0.05)
+    parser.add_argument('--rho_a_prime', type=float, default=10000)
 
     args = parser.parse_args()
 
