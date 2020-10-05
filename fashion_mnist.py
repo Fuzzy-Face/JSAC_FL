@@ -73,7 +73,7 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
     gamma = 3.76
     PL = A0 * ((D / d0) ** (-gamma))
 
-    com_interval = 5 # Also known as "H" in the SPARQ-SGD paper
+    com_interval = 1 # Also known as "H" in the SPARQ-SGD paper
     training_times = 1 # There will be training_times of lists each with a different setup of blockages, each of which is of (ComRound, K)
     # T = 1
     # BW = .5 * 1e4
@@ -103,7 +103,7 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
     seeds = iter(range(1000))
     p = 0.2 # The probability that one edge is included in the connectivity graph as per the Erdos-Renyi (random) graph
     # losseses and accses are of shape (training_times, ComRound, K)
-    tr_losseses, tst_accses = [[] for i in range(training_times)] , [[] for i in range(training_times)]
+    tr_losseses, tst_accses, grad_normses = [[] for i in range(training_times)] , [[] for i in range(training_times)], [[] for i in range(training_times)]
     # # thetases is of shape (training_times, ComRound, K, d)
     # thetases = [[] for i in range(training_times)]
     if scheme == 7:
@@ -190,7 +190,7 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
 
 
         for t, batch_data in enumerate( zip_ds ): # t is the index for the SGD iteration    
-            if t // com_interval >= 3000:
+            if t // com_interval >= 5000:
                 break
 
             # Generate per-iteration channels following Rayleigh fading
@@ -219,17 +219,21 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
 
             # Keep track of \theta_i^{(t+1/2)}'s after the local model updates
             flattened_theta_half_by_devices = []
-            # Keep track of the model paramters in tensors as [\theta_{i,W}, \theta_{i,b}]
+            # Keep track of the model parameters in tensors as [\theta_{i,W}, \theta_{i,b}]
             var_lists_by_devices = []
+            # keep track of the 2-norm mof the gradients as [np.linalg.norm(flattened_grads,2) ** 2]
+            grad_norm_by_devices = []
             for i in range(K): # i is the index for the device (node of graph)
                 model = models[i]
                 # batch_images, batch_labels = sample_data(i, t, train_images, train_labels)
                 batch_images, batch_labels = batch_data[ i ]
                 # Compute the gradients for a list of variables.
                 tr_loss, var_list, grads = calc_grad(model, batch_images, batch_labels)
+                grad_norm_by_devices.append(tf.linalg.global_norm(grads).numpy())
                 # local model updates
                 # opt.apply_gradients( [ ( grad0, var0 ), (grad1, var1), ..., (grad_n, var_n) ] )
                 opts[i].apply_gradients(zip(grads, var_list))
+
                 var_lists_by_devices.append(var_list)
                 # FLatten the updated model parameters in the shape of (7850,)
                 flattened_theta_half_by_devices.append( np.ndarray.flatten(np.concatenate((var_list[0].numpy(),
@@ -271,7 +275,7 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
                     print("Round{}: compression error {:.2f}".format(t // com_interval, comp_error))
                     df = pd.DataFrame(noise_errors[n], columns = ['Device_{}'.format(i + 1) for i in range(K)] )
                     # !!! Note that one m has already been multiplied by N0 when calculating noise_error_by_devices
-                    acc_noise_error = zeta **2 * (m/d) * (2 - m/d) * (df.sum().sum())
+                    acc_noise_error = zeta**2 * (m/d) * (2 - m/d) * (df.sum().sum())
                     print("Round{}: AWGN error {:.2f}".format(t // com_interval, acc_noise_error))
             else: # local training step
                 theta_next_by_devices = var_lists_by_devices
@@ -281,8 +285,6 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
                 # Manually update the var_list to the aggregated value after the consensus update
                 for theta, theta_next in zip(var_list, thetas_next):
                     theta.assign(theta_next)  # theta := tilde_theta
-
-
             
             if not (t % com_interval):
                 # Evaluate the individual model on the test set every com_interval
@@ -322,13 +324,18 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
                 #                     for x in tst_accs))
                 print("Round{}: accuracy level {:.4f}".format(t // com_interval, tst_accs))
 
+                # keep track of the 2-norm gradients by devices (K,) per iteration
+                grad_normses[n].append(grad_norm_by_devices)
+
  
         import sys
         if sys.platform == 'win32':
-            path = './data/pair-wise/'
+            path = './data/simulations/'
         else:
             path = '/scratch/users/k1818742/data/'
 
+        with open('{}grad_normses_SCHEME_{}.pkl'.format(path, scheme), 'wb') as grads:
+            pickle.dump(grad_normses, grads)
         with open('{}losseses_SCHEME_{}_P_{:.4f}_N_{:.0f}_rho_a_{:.2f}_zeta0_{:.4f}_rho_a_prime_{:.2f}.pkl'.format(path, scheme, P, N, rho_a, initial_cr, rho_a_prime), 'wb') as output1:
             pickle.dump(tr_losseses, output1)
         with open('{}accses_SCHEME_{}_P_{:.4f}_N_{:.0f}_rho_a_{:.2f}_zeta0_{:.4f}_rho_a_prime_{:.2f}.pkl'.format(path, scheme, P, N, rho_a, initial_cr, rho_a_prime), 'wb') as output2:
@@ -347,12 +354,12 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
 def main():
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--scheme', type=int, default=7)
-    parser.add_argument('--P', type=float, default=0.0002)
+    parser.add_argument('--scheme', type=int, default=5)
+    parser.add_argument('--P', type=float, default=0.0001)
     parser.add_argument('--N', type=float, default=7943)
     parser.add_argument('--rho_a', type=float, default=500)
-    parser.add_argument('--zeta0', type=float, default=0.05)
-    parser.add_argument('--rho_a_prime', type=float, default=10000)
+    parser.add_argument('--zeta0', type=float, default=0.01)
+    parser.add_argument('--rho_a_prime', type=float, default=100)
 
     args = parser.parse_args()
 
