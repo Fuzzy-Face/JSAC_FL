@@ -75,6 +75,7 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
 
     com_interval = 1 # Also known as "H" in the SPARQ-SGD paper
     training_times = 1 # There will be training_times of lists each with a different setup of blockages, each of which is of (ComRound, K)
+    Tmax = 5000 # Maximum number of commun. rounds during each training session
     # T = 1
     # BW = .5 * 1e4
     N0 = 10 ** (-169/10) * 1e-3  # power spectral density of the AWGN noise per channel use
@@ -112,8 +113,8 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
         cons_errors, comp_errors, noise_errors = [[] for i in range(training_times)], [[] for i in range(training_times)], [[] for i in range(training_times)] 
 
     for n in range(training_times): # n is the index for the times of training
-        # Generate a random graph model suffering from blockages under Erdos Renyi Model
         print("The {}th time of training:".format(n))
+        # Generate a random graph model suffering from blockages under Erdos Renyi Model
         alg_connect = 0
         while alg_connect < 1e-4:
             # # Generate a star-based ER graph
@@ -140,6 +141,9 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
         alpha = 2 / (D[K-1] + D[1])
         W = np.eye(K) - alpha * L
         # _, Chi = TwoSectionH(G) 
+
+        # Generate random channels for unblocked edges of the given graph
+        CH_gen = np.random.randn(Tmax, len(G.edges()))/np.sqrt(2) + 1j * np.random.randn(Tmax, len(G.edges()))/np.sqrt(2) 
 
         models = [
             get_model('Device_{}'.format(i), (28, 28), lamda = 0.001, flag = False) for i in range(K)
@@ -190,16 +194,16 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
 
 
         for t, batch_data in enumerate( zip_ds ): # t is the index for the SGD iteration    
-            if t // com_interval >= 5000:
+            if t // com_interval >= Tmax:
                 break
 
-            # Generate per-iteration channels following Rayleigh fading
-            CH_gen = iter( np.random.randn(len(G.edges()),)/np.sqrt(2) + 1j * np.random.randn(len(G.edges()),)/np.sqrt(2) )
+            # Extract per-iteration channel generator from the tth row of CH_gen
+            CH_gen_current = iter( CH_gen[t] )
             CH = np.ones((K, K), dtype=complex)  # Channel coefficients
             for i in range(K):
                 for j in G[i]:
                     if j < i:
-                        CH[i, j] = next(CH_gen)
+                        CH[i, j] = next(CH_gen_current)
             for i in range(K):
                 for j in G[i]:
                     if j > i:
