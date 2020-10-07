@@ -143,7 +143,9 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
         # _, Chi = TwoSectionH(G) 
 
         # Generate random channels for unblocked edges of the given graph
-        CH_gen = np.random.randn(Tmax, len(G.edges()))/np.sqrt(2) + 1j * np.random.randn(Tmax, len(G.edges()))/np.sqrt(2) 
+        CH_gen = np.random.randn(Tmax, len(G.edges()))/np.sqrt(2) + 1j * np.random.randn(Tmax, len(G.edges()))/np.sqrt(2)
+        with open('channels_Tmax_{:.0f}_{:.0f}-{:.0f}.pkl'.format(Tmax, training_times, n), 'wb') as channels:
+            pickle.dump(tr_losseses, channels) 
 
         models = [
             get_model('Device_{}'.format(i), (28, 28), lamda = 0.001, flag = False) for i in range(K)
@@ -376,7 +378,7 @@ if __name__ == "__main__":
 
     print("TensorFlow version: {}".format(tf.__version__)) #pylint: disable = no-member
     # tf.compat.v1.enable_eager_execution()
-    print("Eager execution: {}".format(tf.executing_eagerly()))
+    # print("Eager execution: {}".format(tf.executing_eagerly()))
     np.set_printoptions(suppress=True)
     tf.keras.backend.set_floatx('float64')
 

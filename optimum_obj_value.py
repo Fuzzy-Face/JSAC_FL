@@ -22,7 +22,7 @@ def train( a, initial_cr ):
     
     np.random.seed(2)
     K = 20
-    num_lack_max = 5
+    num_lack_max = 4
     X, num_per_class, _ = solve_num_per_class(num_lack_max,K) # X is the 10-by-K indicator matrix indicating if data samples from class n is assigned to device K
     num_per_class = num_per_class.astype(int)
 
@@ -194,7 +194,16 @@ def train( a, initial_cr ):
 
     # scp -r k1818742@login.rosalind.kcl.ac.uk:/scratch/users/k1818742/data/*.pkl /home/Helen/MyDocuments/visiting_research@KCL/D2D_DSGD/repo_jv/data/
 
-def main():
+
+
+if __name__ == "__main__":
+
+    print("TensorFlow version: {}".format(tf.__version__)) #pylint: disable = no-member
+    # tf.compat.v1.enable_eager_execution()
+    # print("Eager execution: {}".format(tf.executing_eagerly()))
+    np.set_printoptions(suppress=True)
+    tf.keras.backend.set_floatx('float64')
+
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--a', type=float, default=800)
