@@ -233,10 +233,11 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
                 batch_images, batch_labels = batch_data[ i ]
                 # Compute the gradients for a list of variables.
                 tr_loss, var_list, grads = calc_grad(model, batch_images, batch_labels)
-                grad_norm_by_devices.append(tf.linalg.global_norm(grads).numpy())
                 # local model updates
                 # opt.apply_gradients( [ ( grad0, var0 ), (grad1, var1), ..., (grad_n, var_n) ] )
-                opts[i].apply_gradients(zip(grads, var_list))
+                clipped_grads, grad_norm = tf.clip_by_global_norm(grads, 0.2)
+                opts[i].apply_gradients(zip(clipped_grads, var_list))
+                grad_norm_by_devices.append(grad_norm.numpy())
 
                 var_lists_by_devices.append(var_list)
                 # FLatten the updated model parameters in the shape of (7850,)
@@ -338,8 +339,8 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
         else:
             path = '/scratch/users/k1818742/data/'
 
-        with open('{}grad_normses_SCHEME_{}.pkl'.format(path, scheme), 'wb') as grads:
-            pickle.dump(grad_normses, grads)
+        # with open('{}grad_normses_SCHEME_{}.pkl'.format(path, scheme), 'wb') as grads:
+        #     pickle.dump(grad_normses, grads)
         with open('{}losseses_SCHEME_{}_P_{:.4f}_N_{:.0f}_rho_a_{:.2f}_zeta0_{:.4f}_rho_a_prime_{:.2f}.pkl'.format(path, scheme, P, N, rho_a, initial_cr, rho_a_prime), 'wb') as output1:
             pickle.dump(tr_losseses, output1)
         with open('{}accses_SCHEME_{}_P_{:.4f}_N_{:.0f}_rho_a_{:.2f}_zeta0_{:.4f}_rho_a_prime_{:.2f}.pkl'.format(path, scheme, P, N, rho_a, initial_cr, rho_a_prime), 'wb') as output2:
