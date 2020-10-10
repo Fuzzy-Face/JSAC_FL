@@ -78,7 +78,7 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
     Tmax = 5000 # Maximum number of commun. rounds during each training session
     # T = 1
     # BW = .5 * 1e4
-    N0 = 10 ** (-169/10) * 1e-3  # power spectral density of the AWGN noise per channel use
+    # N0 = 10 ** (-169/10) * 1e-3  # power spectral density of the AWGN noise per channel use
     # N0 = 0
     # N = T * BW
 
@@ -152,12 +152,11 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
         ]
         d = int(sum(theta.numpy().size for theta in models[0].trainable_weights))
 
-        log2_comb_list = [np.ceil(log2_comb(d,q)) for q in range(d + 1)]
-        
+
         if scheme != 1 and not LOCAL:
             flattened_hat_theta_by_devices = [np.zeros((d,)) for i in range(K)] 
 
-            if scheme == 5 or scheme == 7:
+            if scheme == 4 or scheme == 6:
                 schedule_list, Tx_times = seq_scheduling(G.copy())
                 M = 2 * len(schedule_list)
                 m = int(N / M) 
@@ -167,17 +166,17 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
                 # Initialize the \theta_i^{(t)}'s as [\theta_{i,W}=np.zeros((784,10)), \theta_{i,b}=np.zeros((10,))]
                 # for the purpose of keeping track of the consensus and the compression error
                 theta_next_by_devices = [ [np.zeros((784,10)), np.zeros((10,))] for i in range(K)]  
-            elif scheme ==6:
+            elif scheme ==5:
                 m = int(N / K) 
                 tilde_d = 2 ** 13
                 H = hadamard(tilde_d)
                 H_par = H[:m]
 
-            if scheme == 5 or scheme == 6 or scheme == 7:
+            if scheme == 4 or scheme == 5 or scheme == 6:
                 # Initialize the \hat{y}_i^{(t)}'s as zeros
                 hat_y_by_devices = [np.zeros((d,)) for i in range(K)] 
 
-            if scheme == 3:
+            if scheme == 2:
                 _, from_node_to_color_id = TwoSectionH(G)
                 Chi = max(from_node_to_color_id.values()) + 1
 
@@ -227,7 +226,7 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
             flattened_theta_half_by_devices = []
             # Keep track of the model parameters in tensors as [\theta_{i,W}, \theta_{i,b}]
             var_lists_by_devices = []
-            # keep track of the 2-norm mof the gradients as [np.linalg.norm(flattened_grads,2) ** 2]
+            # keep track of the 2-norm mof the gradients as [np.linalg.norm(flattened_grads,2)]
             grad_norm_by_devices = []
             for i in range(K): # i is the index for the device (node of graph)
                 model = models[i]
@@ -255,24 +254,21 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
                 ############ vanila DSGD ################
                 if scheme == 1:
                     theta_next_by_devices = ds.vanila_DSGD(var_lists_by_devices, W, zeta)
-                ############ D-DSGD upper-bound (indefinite channel use) ################
-                elif scheme == 2:
-                    theta_next_by_devices, flattened_hat_theta_by_devices = ds.ub_DSGD(G, flattened_theta_half_by_devices, flattened_hat_theta_by_devices, W, zeta)
                 ############ D-DSGD based on 2-section hypergraph (finite channel use) ################
-                elif scheme == 3:
-                    theta_next_by_devices, flattened_hat_theta_by_devices = ds.proposed_DSGD(G, flattened_theta_half_by_devices, flattened_hat_theta_by_devices, W, zeta, CH, N, Chi, P, N0, log2_comb_list)
+                elif scheme == 2:
+                    theta_next_by_devices, flattened_hat_theta_by_devices = ds.proposed_DSGD(G, flattened_theta_half_by_devices, flattened_hat_theta_by_devices, W, zeta, CH, N, Chi, H_par, P)
                 ############ D-DSGD based on TDMA ################
-                elif scheme == 4:
-                    theta_next_by_devices, flattened_hat_theta_by_devices = ds.TDMA_DSGD(G, flattened_theta_half_by_devices, flattened_hat_theta_by_devices, W, zeta, CH, N, P, N0, log2_comb_list)
+                elif scheme == 3:
+                    theta_next_by_devices, flattened_hat_theta_by_devices = ds.proposed_DSGD(G, flattened_theta_half_by_devices, flattened_hat_theta_by_devices, W, zeta, CH, N, K, H_par, P)
                 ############ A-DSGD based on dynamic coloring of the 2-section hypergraph ################
-                elif scheme == 5:
+                elif scheme == 4:
                     # noise =  np.sqrt(N0 / 2) * np.random.randn(K, s) + 1j * np.sqrt(N0 / 2) * np.random.randn(K, s)
                     theta_next_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices = ans.proposed_DSGD(G, flattened_theta_by_devices, flattened_theta_half_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices, W, zeta, CH, N, schedule_list, Tx_times, H_par, P, N0 = 10 ** (-169/10) * 1e-3)
                 ############ A-DSGD based on TDMA ################
-                elif scheme == 6:
+                elif scheme == 5:
                     theta_next_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices = ans.TDMA_DSGD(G, flattened_theta_half_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices, W, zeta, CH, N, H_par, P)
                 ############ A-DSGD keeping track of the error ################
-                elif scheme == 7:
+                elif scheme == 6:
                     theta_next_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices, cons_error, comp_error, noise_error_by_devices = ans.proposed_DSGD(G, flattened_theta_by_devices, flattened_theta_half_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices, W, zeta, CH, N, schedule_list, Tx_times, H_par, P, flag = True)
                     cons_errors[n].append(cons_error)
                     comp_errors[n].append(comp_error)

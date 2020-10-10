@@ -67,7 +67,7 @@ def log2_comb(n, k):
     return log2_comb
 
 
-def dig_sparse_level(G, CG, N, Chi, P, N0, log2_comb_list, d = 7850):
+def dig_sparse_level(G, CG, N, Chi, P, log2_comb_list, N0 = 10 ** (-169/10) * 1e-3, d = 7850):
     # s =  d / 3  # d\times 1 is the dimension of total number of parameters for each model, i.e., W.shape[0] * W.shape[1] + len(b)
     barP = P / N 
     q_array, b_array = [], []
@@ -93,7 +93,13 @@ def dig_sparse_level(G, CG, N, Chi, P, N0, log2_comb_list, d = 7850):
 
     return q_array, b_array
 
-     
+def dig_comp_level(G, CG, N, Chi, barP, N0 = 10 ** (-169/10) * 1e-3, b = 64, d = 7850):
+    m_array = [np.floor( N / Chi * np.log2(1 + barP * Chi / N0 * min(CG[i,[j-1 for j in G[i]]])) / b ) for i in range(CG.shape[0])]
+    m_array = np.minimum(np.array(m_array), d)
+
+    return m_array
+
+   
 def MyNeighbour(E, ii):
     neighbour = []
     for i, j in E:

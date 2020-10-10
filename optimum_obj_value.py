@@ -51,7 +51,7 @@ def train( a, initial_cr ):
 
     com_interval = 1 # Also known as "H" in the SPARQ-SGD paper
     training_times = 1 # There will be training_times of lists each with a different setup of blockages, each of which is of (ComRound, K)
-    Tmax = 5000 # Maximum number of commun. rounds during each training session
+    Tmax = 10000 # Maximum number of commun. rounds during each training session
 
     LOCAL = False
     # scheme = 5
@@ -71,7 +71,7 @@ def train( a, initial_cr ):
     seeds = iter(range(1000))
     p = 0.2 # The probability that one edge is included in the connectivity graph as per the Erdos-Renyi (random) graph
     # losseses and accses are of shape (training_times, ComRound, K)
-    tr_losseses, tst_accses = [[] for i in range(training_times)] , [[] for i in range(training_times)]
+    tr_losseses, tst_accses, grad_normses = [[] for i in range(training_times)] , [[] for i in range(training_times)], [[] for i in range(training_times)]
 
 
 
@@ -117,7 +117,8 @@ def train( a, initial_cr ):
         for t in range(Tmax): # t is the index for the SGD iteration    
             # Keep track of the model parameters in tensors as [\theta_{i,W}, \theta_{i,b}]
             var_lists_by_devices = []
-
+            # keep track of the 2-norm mof the gradients as [np.linalg.norm(flattened_grads,2)]
+            grad_norm_by_devices = []
             for i in range(K): # i is the index for the device (node of graph)
                 model = models[i]
                 # batch_images, batch_labels = sample_data(i, t, train_images, train_labels)
@@ -126,8 +127,12 @@ def train( a, initial_cr ):
                 tr_loss, var_list, grads = calc_grad(model, batch_images, batch_labels)
                 # local model updates
                 # opt.apply_gradients( [ ( grad0, var0 ), (grad1, var1), ..., (grad_n, var_n) ] )
-                clipped_grads, _ = tf.clip_by_global_norm(grads, 0.15)
-                opts[i].apply_gradients(zip(clipped_grads, var_list))
+                grad_norm = tf.linalg.global_norm(grads)
+                grad_norm_by_devices.append(grad_norm.numpy())
+                opts[i].apply_gradients(zip(grads, var_list))
+                # opt.apply_gradients with gradient clipping
+                # clipped_grads, grad_norm = tf.clip_by_global_norm(grads, 0.15)
+                # opts[i].apply_gradients(zip(clipped_grads, var_list))
 
                 var_lists_by_devices.append(var_list)
 
@@ -177,6 +182,9 @@ def train( a, initial_cr ):
                 #                     for x in tst_accs))
                 print("Round{}: accuracy level {:.4f}".format(t // com_interval, tst_accs))
 
+                # keep track of the 2-norm gradients by devices (K,) per iteration
+                grad_normses[n].append(grad_norm_by_devices)
+
 
  
         import sys
@@ -185,11 +193,11 @@ def train( a, initial_cr ):
         else:
             path = '/scratch/users/k1818742/data/'
 
-        # with open('{}grad_normses_SCHEME_{}.pkl'.format(path, scheme), 'wb') as grads:
-        #     pickle.dump(grad_normses, grads)
-        with open('{}losseses_SCHEME_{}_rho_a_{:.2f}_zeta0_{:.2f}.pkl'.format(path, 1, a, initial_cr), 'wb') as output1:
+        with open('{}grad_normses_SCHEME_{}.pkl'.format(path, 0), 'wb') as grads:
+            pickle.dump(grad_normses, grads)
+        with open('{}losseses_SCHEME_{}_a_{:.2f}_zeta0_{:.2f}.pkl'.format(path, 0, a, initial_cr), 'wb') as output1:
             pickle.dump(tr_losseses, output1)
-        with open('{}accses_SCHEME_{}_rho_a_{:.2f}_zeta0_{:.2f}.pkl'.format(path, 1, a, initial_cr), 'wb') as output2:
+        with open('{}accses_SCHEME_{}_a_{:.2f}_zeta0_{:.2f}.pkl'.format(path, 0, a, initial_cr), 'wb') as output2:
             pickle.dump(tst_accses, output2)
 
     # scp -r k1818742@login.rosalind.kcl.ac.uk:/scratch/users/k1818742/data/*.pkl /home/Helen/MyDocuments/visiting_research@KCL/D2D_DSGD/repo_jv/data/
@@ -206,8 +214,8 @@ if __name__ == "__main__":
 
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--a', type=float, default=800)
-    parser.add_argument('--zeta0', type=float, default=1)
+    parser.add_argument('--a', type=float, default=750)
+    parser.add_argument('--zeta0', type=float, default=0.01)
 
     args = parser.parse_args()
 

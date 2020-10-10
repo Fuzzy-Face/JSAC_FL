@@ -16,7 +16,7 @@ def proposed_DSGD(G, flattened_theta_by_devices, flattened_theta_half_by_devices
     temp = [H_par[i,:] * r for i in range(m)]
     A = (1 / np.sqrt(m)) * np.array(temp) # A^{(t)} is of shape (m, d)
 
-    ########## for flat matrix U (RLC solution) ############
+    ########## Random Linear Coding (RLC) ############
     # A list (device_i's) of model differences that device i prepares to send to its neighbours
     model_diff = [flattened_theta_half_by_devices[i] - flattened_hat_theta_by_devices[i]
                             for i in range(K)] 
@@ -83,6 +83,7 @@ def proposed_DSGD(G, flattened_theta_by_devices, flattened_theta_half_by_devices
                                                 zeta * ( W[i,i]*flattened_hat_theta_by_devices[i] + hat_y_by_devices[i] -
                                                         flattened_hat_theta_by_devices[i] ) 
                                                     for i in range(K) ]
+
     # Unflatten the theta_next's in a list (device_i's) of [theta_{i}^{W}, theta_{i}^{b}]
     theta_next_by_devices = [ [ flattened_theta_next_by_devices[i][:7840].reshape((784,10)),  
                                 flattened_theta_next_by_devices[i][7840:] ] for i in range(K) ] 
@@ -132,11 +133,12 @@ def TDMA_DSGD(G, flattened_theta_half_by_devices, flattened_hat_theta_by_devices
     
     # print("Normalized MSE(dB):", "|".join("{:.2f}".format(10 * np.log10(RLC_error[i])) for i in range(K)))
 
-    # flattened_theta_next_by_devices turns out to be a list (device_i's) of aggregate theta_i's after the consensus update)
+    # flattened_theta_next_by_devices turns out to be a list (device_i's) of aggregate theta_i's after the consensus update
     flattened_theta_next_by_devices = [ flattened_theta_half_by_devices[i] + 
                                                 zeta * ( W[i,i]*flattened_hat_theta_by_devices[i] + hat_y_by_devices[i] -
                                                         flattened_hat_theta_by_devices[i] ) 
                                                     for i in range(K) ]
+                                                    
     # Unflatten the theta_next's in a list (device_i's) of [theta_{i}^{W}, theta_{i}^{b}]
     theta_next_by_devices = [[flattened_theta_next_by_devices[i][:7840].reshape((784,10)),  
                                 flattened_theta_next_by_devices[i][7840:]] for i in range(K)] 
