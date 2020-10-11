@@ -345,9 +345,9 @@ def train( scheme, P, N, a, initial_cr, a_prime ):
 
         # with open('{}grad_normses_SCHEME_{}.pkl'.format(path, scheme), 'wb') as grads:
         #     pickle.dump(grad_normses, grads)
-        with open('{}losseses_SCHEME_{}_P_{:.4f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime), 'wb') as output1:
+        with open('{}losseses_SCHEME_{}_P_{:.4f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_2-D_torus.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime), 'wb') as output1:
             pickle.dump(tr_losseses, output1)
-        with open('{}accses_SCHEME_{}_P_{:.4f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime), 'wb') as output2:
+        with open('{}accses_SCHEME_{}_P_{:.4f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_2-D_torus.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime), 'wb') as output2:
             pickle.dump(tst_accses, output2)
         
         if scheme == 6:
