@@ -10,22 +10,22 @@ def vanila_DSGD(var_lists_by_Devices, W, zeta): # vanila DSGD
 
 
 
-def proposed_DSGD(G, flattened_theta_by_devices, flattened_hat_theta_by_devices, W, zeta, CH, N, Chi, H_par, P, d = 7850, tilde_d = 2 ** 13):
+def proposed_DSGD(G, flattened_theta_by_devices, flattened_hat_theta_by_devices, W, zeta, CH, N, Chi, H, barP, d = 7850, tilde_d = 2 ** 13):
     K = len(G.nodes())
     CG = np.abs(CH) ** 2
     # A list (device_i's) of #rows for the RLC matrix supported by the channels of each device to its neighbors
-    m_array= dig_comp_level(G, CG, N, Chi, P)
+    m_array= dig_comp_level(G, CG, N, Chi, barP)
 
     ########## Random Linear Coding (RLC) ############
     r = np.random.binomial(1, .5, (tilde_d,))
     r[r == 0] = -1
     for i in range(K):
-        temp = [H_par[i,:] * r for i in range(m_array[i])]
+        temp = [H[i,:] * r for i in range(m_array[i])]
         A = (1 / np.sqrt(m_array[i])) * np.array(temp) # A^{(t)} is of shape (m, d)
         # A list (device_i's) of model differences that device i prepares to broadcast to its neighbours
         model_diff = flattened_theta_by_devices[i] - flattened_hat_theta_by_devices[i]
         # A list (device_i's) of compressed signal that device i prepares to broadcast to its neighbours 
-        u = np.concatenate((model_diff[i], np.zeros( (tilde_d - d,) )), axis = 0) 
+        u = np.concatenate((model_diff, np.zeros( (tilde_d - d,) )), axis = 0) 
         flattened_hat_theta_by_devices[i] += ( m_array[i]/d * A.T @ (A @ u) )[:d]
 
     # flattened_theta_next_by_devices turns out to be a list (device_i's) of aggregate theta_i's after the consensus update

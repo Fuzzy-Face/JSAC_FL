@@ -13,7 +13,7 @@ import analog_schemes as ans
 # from scipy.sparse import identity, csr_matrix
 
 
-def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
+def train( scheme, P, N, a, initial_cr, a_prime ):
 
     (train_images, train_labels), (test_images,
                                 test_labels) = keras.datasets.fashion_mnist.load_data()
@@ -85,18 +85,18 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
     LOCAL = False
     # scheme = 5
     # Generate a learning rate scheduler that returns initial_learning_rate / (1 + decay_rate * t / decay_step)
-    decayed_learning = True
-    mu = 0.002 # assuming eta = (4/mu/a) / (1 + t/a), where mu = 2*lamda
-    b = 4/mu # 4/mu = 2000
-    initial_lr = b / rho_a
-    decay_steps = rho_a
+    decayed_learning = False
+    mu = 0.002 # assuming eta = (3.25/mu/a) / (1 + t/a), where mu = 2*lamda
+    b = 3.25/mu # 3.25/mu = 1625
+    initial_lr = b / a
+    decay_steps = a
     decay_rate = 1
     learning_rate_fn = keras.optimizers.schedules.InverseTimeDecay(initial_lr,
                                                                     decay_steps, decay_rate)
-    decayed_cr = True
+    decayed_cr = False
     # initial_cr = 0.01
-    # rho_a = 5.0
-    cs_rate_fn = lambda t: initial_cr / (1 + t/rho_a_prime)
+    # a = 5.0
+    cs_rate_fn = lambda t: initial_cr / (1 + t/a_prime)
 
     loss_fn = keras.losses.SparseCategoricalCrossentropy()
     acc_fn = keras.metrics.SparseCategoricalAccuracy()
@@ -107,7 +107,7 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
     tr_losseses, tst_accses, grad_normses = [[] for i in range(training_times)] , [[] for i in range(training_times)], [[] for i in range(training_times)]
     # # thetases is of shape (training_times, ComRound, K, d)
     # thetases = [[] for i in range(training_times)]
-    if scheme == 7:
+    if scheme == 6:
         # cons_errors/comp_errors is of shape (training_times, ComRound, 1)
         # noise_errors is of shape (training_times, ComRound, 1)
         cons_errors, comp_errors, noise_errors = [[] for i in range(training_times)], [[] for i in range(training_times)], [[] for i in range(training_times)] 
@@ -145,7 +145,7 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
         # Generate random channels for unblocked edges of the given graph
         CH_gen = np.random.randn(Tmax, len(G.edges()))/np.sqrt(2) + 1j * np.random.randn(Tmax, len(G.edges()))/np.sqrt(2)
         with open('channels_Tmax_{:.0f}_{:.0f}-{:.0f}.pkl'.format(Tmax, training_times, n), 'wb') as channels:
-            pickle.dump(tr_losseses, channels) 
+            pickle.dump(CH_gen, channels) 
 
         models = [
             get_model('Device_{}'.format(i), (28, 28), lamda = 0.001, flag = False) for i in range(K)
@@ -154,22 +154,20 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
 
 
         if scheme != 1 and not LOCAL:
+            tilde_d = 2 ** 13
+            H = hadamard(tilde_d)
             flattened_hat_theta_by_devices = [np.zeros((d,)) for i in range(K)] 
 
             if scheme == 4 or scheme == 6:
                 schedule_list, Tx_times = seq_scheduling(G.copy())
                 M = 2 * len(schedule_list)
                 m = int(N / M) 
-                tilde_d = 2 ** 13
-                H = hadamard(tilde_d)
                 H_par = H[:m] 
                 # Initialize the \theta_i^{(t)}'s as [\theta_{i,W}=np.zeros((784,10)), \theta_{i,b}=np.zeros((10,))]
                 # for the purpose of keeping track of the consensus and the compression error
                 theta_next_by_devices = [ [np.zeros((784,10)), np.zeros((10,))] for i in range(K)]  
             elif scheme ==5:
                 m = int(N / K) 
-                tilde_d = 2 ** 13
-                H = hadamard(tilde_d)
                 H_par = H[:m]
 
             if scheme == 4 or scheme == 5 or scheme == 6:
@@ -256,10 +254,10 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
                     theta_next_by_devices = ds.vanila_DSGD(var_lists_by_devices, W, zeta)
                 ############ D-DSGD based on 2-section hypergraph (finite channel use) ################
                 elif scheme == 2:
-                    theta_next_by_devices, flattened_hat_theta_by_devices = ds.proposed_DSGD(G, flattened_theta_half_by_devices, flattened_hat_theta_by_devices, W, zeta, CH, N, Chi, H_par, P)
+                    theta_next_by_devices, flattened_hat_theta_by_devices = ds.proposed_DSGD(G, flattened_theta_half_by_devices, flattened_hat_theta_by_devices, W, zeta, CH, N, Chi, H, P)
                 ############ D-DSGD based on TDMA ################
                 elif scheme == 3:
-                    theta_next_by_devices, flattened_hat_theta_by_devices = ds.proposed_DSGD(G, flattened_theta_half_by_devices, flattened_hat_theta_by_devices, W, zeta, CH, N, K, H_par, P)
+                    theta_next_by_devices, flattened_hat_theta_by_devices = ds.proposed_DSGD(G, flattened_theta_half_by_devices, flattened_hat_theta_by_devices, W, zeta, CH, N, K, H, P)
                 ############ A-DSGD based on dynamic coloring of the 2-section hypergraph ################
                 elif scheme == 4:
                     # noise =  np.sqrt(N0 / 2) * np.random.randn(K, s) + 1j * np.sqrt(N0 / 2) * np.random.randn(K, s)
@@ -339,17 +337,17 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
 
         # with open('{}grad_normses_SCHEME_{}.pkl'.format(path, scheme), 'wb') as grads:
         #     pickle.dump(grad_normses, grads)
-        with open('{}losseses_SCHEME_{}_P_{:.4f}_N_{:.0f}_rho_a_{:.2f}_zeta0_{:.4f}_rho_a_prime_{:.2f}.pkl'.format(path, scheme, P, N, rho_a, initial_cr, rho_a_prime), 'wb') as output1:
+        with open('{}losseses_SCHEME_{}_P_{:.4f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime), 'wb') as output1:
             pickle.dump(tr_losseses, output1)
-        with open('{}accses_SCHEME_{}_P_{:.4f}_N_{:.0f}_rho_a_{:.2f}_zeta0_{:.4f}_rho_a_prime_{:.2f}.pkl'.format(path, scheme, P, N, rho_a, initial_cr, rho_a_prime), 'wb') as output2:
+        with open('{}accses_SCHEME_{}_P_{:.4f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime), 'wb') as output2:
             pickle.dump(tst_accses, output2)
         
         if scheme == 7:
-            with open('{}cons_e_SCHEME_{}_P_{:.4f}_N_{:.0f}_rho_a_{:.2f}_zeta0_{:.4f}_rho_a_prime_{:.2f}.pkl'.format(path, scheme, P, N, rho_a, initial_cr, rho_a_prime), 'wb') as output3:
+            with open('{}cons_e_SCHEME_{}_P_{:.4f}_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}.pkl'.format(path, scheme, P, N, a, initial_cr, a_prime), 'wb') as output3:
                 pickle.dump(cons_errors, output3)
-            with open('{}comp_e_SCHEME_{}_P_{:.4f}_N_{:.0f}_rho_a_{:.2f}_zeta0_{:.4f}_rho_a_prime_{:.2f}.pkl'.format(path, scheme, P, N, rho_a, initial_cr, rho_a_prime), 'wb') as output4:
+            with open('{}comp_e_SCHEME_{}_P_{:.4f}_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}.pkl'.format(path, scheme, P, N, a, initial_cr, a_prime), 'wb') as output4:
                 pickle.dump(comp_errors, output4)
-            with open('{}noise_e_SCHEME_{}_P_{:.4f}_N_{:.0f}_rho_a_{:.2f}_zeta0_{:.4f}_rho_a_prime_{:.2f}.pkl'.format(path, scheme, P, N, rho_a, initial_cr, rho_a_prime), 'wb') as output5:
+            with open('{}noise_e_SCHEME_{}_P_{:.4f}_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}.pkl'.format(path, scheme, P, N, a, initial_cr, a_prime), 'wb') as output5:
                 pickle.dump(noise_errors, output5)
 
     # scp -r k1818742@login.rosalind.kcl.ac.uk:/scratch/users/k1818742/data/*.pkl /home/Helen/MyDocuments/visiting_research@KCL/D2D_DSGD/repo_jv/data/
@@ -357,16 +355,16 @@ def train( scheme, P, N, rho_a, initial_cr, rho_a_prime ):
 def main():
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--scheme', type=int, default=5)
-    parser.add_argument('--P', type=float, default=0.0001)
+    parser.add_argument('--scheme', type=int, default=1)
+    parser.add_argument('--P', type=float, default=2e-6)
     parser.add_argument('--N', type=float, default=7943)
-    parser.add_argument('--rho_a', type=float, default=500)
-    parser.add_argument('--zeta0', type=float, default=0.01)
-    parser.add_argument('--rho_a_prime', type=float, default=100)
+    parser.add_argument('--a', type=float, default=1000)
+    parser.add_argument('--zeta0', type=float, default=1)
+    parser.add_argument('--a_prime', type=float, default=100)
 
     args = parser.parse_args()
 
-    train( args.scheme, args.P, args.N, args.rho_a, args.zeta0, args.rho_a_prime )
+    train( args.scheme, args.P, args.N, args.a, args.zeta0, args.a_prime )
 
 
 
