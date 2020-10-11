@@ -61,17 +61,19 @@ def train( scheme, P, N, a, initial_cr, a_prime ):
     rho =  d_min + (d_max - d_min) * np.random.rand(K,1) 
     theta = 2 * np.pi * np.random.rand(K,1)
     # D = np.ones((K, K))
-    D = np.sqrt(rho ** 2 + rho.T ** 2 - 2 * (rho @ rho.T) * np.cos(theta - theta.T))
+    Dist = np.sqrt(rho ** 2 + rho.T ** 2 - 2 * (rho @ rho.T) * np.cos(theta - theta.T))
     # Fill in D[i,i] some non-zero value to avoid Inf in PL
     for i in range(K):
         if i:
-            D[i,i] = D[i,i-1]
+            Dist[i,i] = Dist[i,i-1]
         else:
-            D[i,i] = D[i,i+1]
+            Dist[i,i] = Dist[i,i+1]
     A0 = 10 ** (-3.35)
     d0 = 1
     gamma = 3.76
-    PL = A0 * ((D / d0) ** (-gamma))
+    PL = A0 * ((Dist / d0) ** (-gamma)) 
+    # average SNR is ~10*np.log10(P / N0 * M * mean(temp)) 
+    # where mean(temp)=sum(temp)/len(G.nodes()) with temp = [min(PL[i,j]  for j in G[node]) for node in G.nodes()] (~4.11e-12 in this example)
 
     com_interval = 1 # Also known as "H" in the SPARQ-SGD paper
     training_times = 1 # There will be training_times of lists each with a different setup of blockages, each of which is of (ComRound, K)
@@ -85,7 +87,7 @@ def train( scheme, P, N, a, initial_cr, a_prime ):
     LOCAL = False
     # scheme = 5
     # Generate a learning rate scheduler that returns initial_learning_rate / (1 + decay_rate * t / decay_step)
-    decayed_learning = False
+    decayed_learning = True
     mu = 0.002 # assuming eta = (3.25/mu/a) / (1 + t/a), where mu = 2*lamda
     b = 3.25/mu # 3.25/mu = 1625
     initial_lr = b / a
@@ -123,29 +125,34 @@ def train( scheme, P, N, a, initial_cr, a_prime ):
             # G = net.star_graph(reversed(range(K)))
             # G.add_edges_from(ER.edges())
 
-            # Generate an arbitrary ER graph
-            G = net.erdos_renyi_graph(K, p, seed = next(seeds))
+            # # Generate an arbitrary ER graph
+            # G = net.erdos_renyi_graph(K, p, seed = next(seeds))
 
-            # # Generate a 2-D torus (5-by-4)
-            # G = net.grid_2d_graph(5, 4, periodic=True)
-            # mapping = { (m,n):4*m+n for m, n in G.nodes()}
-            # _ = net.relabel_nodes(G, mapping, copy=False)
+            # # Generate a cycle graph
+            # G = net.cycle_graph(K)
+
+            # Generate a 2-D torus (5-by-4)
+            G = net.grid_2d_graph(5, 4, periodic=True)
+            mapping = { (m,n):4*m+n for m, n in G.nodes()}
+            _ = net.relabel_nodes(G, mapping, copy=False)
 
             # # Generate a complete graph
             # G = net.complete_graph(K)
 
             L = np.array(net.laplacian_matrix(G, nodelist = range(K)).todense())
-            D, _ = np.linalg.eigh(L) # eigenvalues are assumed given in an ascending order
-            alg_connect = D[1] 
+            Dist, _ = np.linalg.eigh(L) # eigenvalues are assumed given in an ascending order
+            alg_connect = Dist[1] 
         # W, _ = solve_graph_weights(K, E)
-        alpha = 2 / (D[K-1] + D[1])
+        alpha = 2 / (Dist[K-1] + Dist[1])
         W = np.eye(K) - alpha * L
         # _, Chi = TwoSectionH(G) 
 
         # Generate random channels for unblocked edges of the given graph
         CH_gen = np.random.randn(Tmax, len(G.edges()))/np.sqrt(2) + 1j * np.random.randn(Tmax, len(G.edges()))/np.sqrt(2)
-        with open('channels_Tmax_{:.0f}_{:.0f}-{:.0f}.pkl'.format(Tmax, training_times, n), 'wb') as channels:
-            pickle.dump(CH_gen, channels) 
+        # with open('./data/simulations/channels_Tmax_{:.0f}_{:.0f}-{:.0f}.pkl'.format(Tmax, training_times, n), 'wb') as channels:
+        #     pickle.dump(CH_gen, channels) 
+        # with open('./data/simulations/channels_Tmax_{:.0f}_{:.0f}-{:.0f}.pkl'.format(Tmax, training_times, n), 'rb') as channels:
+        #     CH_gen = pickle.load(channels) 
 
         models = [
             get_model('Device_{}'.format(i), (28, 28), lamda = 0.001, flag = False) for i in range(K)
@@ -166,7 +173,7 @@ def train( scheme, P, N, a, initial_cr, a_prime ):
                 # Initialize the \theta_i^{(t)}'s as [\theta_{i,W}=np.zeros((784,10)), \theta_{i,b}=np.zeros((10,))]
                 # for the purpose of keeping track of the consensus and the compression error
                 theta_next_by_devices = [ [np.zeros((784,10)), np.zeros((10,))] for i in range(K)]  
-            elif scheme ==5:
+            elif scheme == 5:
                 m = int(N / K) 
                 H_par = H[:m]
 
@@ -177,6 +184,7 @@ def train( scheme, P, N, a, initial_cr, a_prime ):
             if scheme == 2:
                 _, from_node_to_color_id = TwoSectionH(G)
                 Chi = max(from_node_to_color_id.values()) + 1
+                Chi = 20
 
         #     A = np.random.randn(s, d) * np.sqrt(1 / d)
         #     if s >= d:
@@ -209,7 +217,7 @@ def train( scheme, P, N, a, initial_cr, a_prime ):
                         CH[i, j] = np.conjugate(CH[j, i])
             CH = np.sqrt(PL) * CH 
             
-            if scheme == 5 or scheme == 6 or scheme == 7:
+            if scheme == 4 or scheme == 5 or scheme == 6:
             # Keep track of the original theta_i^{(t)}'s at the beginning of the iteration t
                 if isinstance(theta_next_by_devices[0][0], tf.Variable):
                     flattened_theta_by_devices = [ np.ndarray.flatten(np.concatenate(( theta_next[0].numpy(),
@@ -342,7 +350,7 @@ def train( scheme, P, N, a, initial_cr, a_prime ):
         with open('{}accses_SCHEME_{}_P_{:.4f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime), 'wb') as output2:
             pickle.dump(tst_accses, output2)
         
-        if scheme == 7:
+        if scheme == 6:
             with open('{}cons_e_SCHEME_{}_P_{:.4f}_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}.pkl'.format(path, scheme, P, N, a, initial_cr, a_prime), 'wb') as output3:
                 pickle.dump(cons_errors, output3)
             with open('{}comp_e_SCHEME_{}_P_{:.4f}_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}.pkl'.format(path, scheme, P, N, a, initial_cr, a_prime), 'wb') as output4:
@@ -355,11 +363,11 @@ def train( scheme, P, N, a, initial_cr, a_prime ):
 def main():
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--scheme', type=int, default=1)
+    parser.add_argument('--scheme', type=int, default=2)
     parser.add_argument('--P', type=float, default=2e-6)
     parser.add_argument('--N', type=float, default=7943)
     parser.add_argument('--a', type=float, default=1000)
-    parser.add_argument('--zeta0', type=float, default=1)
+    parser.add_argument('--zeta0', type=float, default=0.005)
     parser.add_argument('--a_prime', type=float, default=100)
 
     args = parser.parse_args()
