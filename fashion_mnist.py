@@ -125,11 +125,11 @@ def train( scheme, P, N, a, initial_cr, a_prime ):
             # G = net.star_graph(reversed(range(K)))
             # G.add_edges_from(ER.edges())
 
-            # Generate an arbitrary ER graph
-            G = net.erdos_renyi_graph(K, p, seed = next(seeds))
+            # # Generate an arbitrary ER graph
+            # G = net.erdos_renyi_graph(K, p, seed = next(seeds))
 
-            # # Generate a cycle graph
-            # G = net.cycle_graph(K)
+            # Generate a ring(cycle) graph
+            G = net.cycle_graph(K)
 
             # # Generate a 2-D torus (5-by-4)
             # G = net.grid_2d_graph(5, 4, periodic=True)
@@ -345,9 +345,9 @@ def train( scheme, P, N, a, initial_cr, a_prime ):
 
         # with open('{}grad_normses_SCHEME_{}.pkl'.format(path, scheme), 'wb') as grads:
         #     pickle.dump(grad_normses, grads)
-        with open('{}losseses_SCHEME_{}_P_{:.4f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_ER.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime), 'wb') as output1:
+        with open('{}losseses_SCHEME_{}_P_{:.4f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_ring.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime), 'wb') as output1:
             pickle.dump(tr_losseses, output1)
-        with open('{}accses_SCHEME_{}_P_{:.4f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_ER.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime), 'wb') as output2:
+        with open('{}accses_SCHEME_{}_P_{:.4f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_ring.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime), 'wb') as output2:
             pickle.dump(tst_accses, output2)
         
         if scheme == 6:
