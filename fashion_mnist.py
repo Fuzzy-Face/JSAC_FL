@@ -125,11 +125,11 @@ def train( scheme, P, N, a, initial_cr, a_prime ):
             # G = net.star_graph(reversed(range(K)))
             # G.add_edges_from(ER.edges())
 
-            # # Generate an arbitrary ER graph
-            # G = net.erdos_renyi_graph(K, p, seed = next(seeds))
+            # Generate an arbitrary ER graph
+            G = net.erdos_renyi_graph(K, p, seed = next(seeds))
 
-            # Generate a ring(cycle) graph
-            G = net.cycle_graph(K)
+            # # Generate a ring(cycle) graph
+            # G = net.cycle_graph(K)
 
             # # Generate a 2-D torus (5-by-4)
             # G = net.grid_2d_graph(5, 4, periodic=True)
@@ -184,7 +184,7 @@ def train( scheme, P, N, a, initial_cr, a_prime ):
             if scheme == 2:
                 _, from_node_to_color_id = TwoSectionH(G)
                 Chi = max(from_node_to_color_id.values()) + 1
-                Chi = 20
+                # Chi = 20 only used for comparing performance with different topologies (thus a common M = Chi for fair comparison)
 
         #     A = np.random.randn(s, d) * np.sqrt(1 / d)
         #     if s >= d:
@@ -345,17 +345,17 @@ def train( scheme, P, N, a, initial_cr, a_prime ):
 
         # with open('{}grad_normses_SCHEME_{}.pkl'.format(path, scheme), 'wb') as grads:
         #     pickle.dump(grad_normses, grads)
-        with open('{}losseses_SCHEME_{}_P_{:.4f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_ring.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime), 'wb') as output1:
+        with open('{}losseses_SCHEME_{}_P_{:.4f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime), 'wb') as output1:
             pickle.dump(tr_losseses, output1)
-        with open('{}accses_SCHEME_{}_P_{:.4f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_ring.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime), 'wb') as output2:
+        with open('{}accses_SCHEME_{}_P_{:.4f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime), 'wb') as output2:
             pickle.dump(tst_accses, output2)
         
         if scheme == 6:
-            with open('{}cons_e_SCHEME_{}_P_{:.4f}_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}.pkl'.format(path, scheme, P, N, a, initial_cr, a_prime), 'wb') as output3:
+            with open('{}cons_e_SCHEME_{}_P_{:.4f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime), 'wb') as output3:
                 pickle.dump(cons_errors, output3)
-            with open('{}comp_e_SCHEME_{}_P_{:.4f}_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}.pkl'.format(path, scheme, P, N, a, initial_cr, a_prime), 'wb') as output4:
+            with open('{}comp_e_SCHEME_{}_P_{:.4f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime), 'wb') as output4:
                 pickle.dump(comp_errors, output4)
-            with open('{}noise_e_SCHEME_{}_P_{:.4f}_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}.pkl'.format(path, scheme, P, N, a, initial_cr, a_prime), 'wb') as output5:
+            with open('{}noise_e_SCHEME_{}_P_{:.4f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime), 'wb') as output5:
                 pickle.dump(noise_errors, output5)
 
     # scp -r k1818742@login.rosalind.kcl.ac.uk:/scratch/users/k1818742/data/*.pkl /home/Helen/MyDocuments/visiting_research@KCL/D2D_DSGD/repo_jv/data/
