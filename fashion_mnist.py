@@ -132,13 +132,13 @@ def train( scheme, P, N, a, initial_cr, a_prime ):
             # G = net.cycle_graph(K)
             # G.remove_edge(0, K-1)
 
-            # # Generate a 2-D torus (5-by-4)
-            # G = net.grid_2d_graph(5, 4, periodic=True)
-            # mapping = { (m,n):4*m+n for m, n in G.nodes()}
-            # _ = net.relabel_nodes(G, mapping, copy=False)
+            # Generate a 2-D torus (5-by-4)
+            G = net.grid_2d_graph(5, 4, periodic=True)
+            mapping = { (m,n):4*m+n for m, n in G.nodes()}
+            _ = net.relabel_nodes(G, mapping, copy=False)
 
-            # Generate a complete graph
-            G = net.complete_graph(K)
+            # # Generate a complete graph
+            # G = net.complete_graph(K)
 
             L = np.array(net.laplacian_matrix(G, nodelist = range(K)).todense())
             Dist, _ = np.linalg.eigh(L) # eigenvalues are assumed given in an ascending order
@@ -185,7 +185,7 @@ def train( scheme, P, N, a, initial_cr, a_prime ):
             if scheme == 2:
                 _, from_node_to_color_id = TwoSectionH(G)
                 Chi = max(from_node_to_color_id.values()) + 1
-                Chi = 20 # only used for comparing performance with different topologies (thus a common M = Chi for fair comparison)
+                # Chi = 20 # only used for comparing performance with different topologies (thus a common M = Chi for fair comparison)
 
         #     A = np.random.randn(s, d) * np.sqrt(1 / d)
         #     if s >= d:
@@ -346,9 +346,9 @@ def train( scheme, P, N, a, initial_cr, a_prime ):
 
         # with open('{}grad_normses_SCHEME_{}.pkl'.format(path, scheme), 'wb') as grads:
         #     pickle.dump(grad_normses, grads)
-        with open('{}losseses_SCHEME_{}_P_{:.4f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_CG.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime), 'wb') as output1:
+        with open('{}losseses_SCHEME_{}_P_{:.4f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_2-D_torus.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime), 'wb') as output1:
             pickle.dump(tr_losseses, output1)
-        with open('{}accses_SCHEME_{}_P_{:.4f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_CG.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime), 'wb') as output2:
+        with open('{}accses_SCHEME_{}_P_{:.4f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_2-D_torus.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime), 'wb') as output2:
             pickle.dump(tst_accses, output2)
         
         if scheme == 6:
@@ -366,7 +366,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--scheme', type=int, default=2)
     parser.add_argument('--P', type=float, default=2e-6)
-    parser.add_argument('--N', type=float, default=30000)
+    parser.add_argument('--N', type=float, default=7943)
     parser.add_argument('--a', type=float, default=1000)
     parser.add_argument('--zeta0', type=float, default=0.005)
     parser.add_argument('--a_prime', type=float, default=100)
