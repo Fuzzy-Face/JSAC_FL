@@ -95,7 +95,7 @@ def train( scheme, P, N, a, initial_cr, a_prime ):
     decay_rate = 1
     learning_rate_fn = keras.optimizers.schedules.InverseTimeDecay(initial_lr,
                                                                     decay_steps, decay_rate)
-    decayed_cr = False
+    decayed_cr = True
     # initial_cr = 0.01
     # a = 5.0
     cs_rate_fn = lambda t: initial_cr / (1 + t/a_prime)
@@ -348,8 +348,8 @@ def train( scheme, P, N, a, initial_cr, a_prime ):
         #     pickle.dump(grad_normses, grads)
         with open('{}losseses_SCHEME_{}_P_{:.4f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_2-D_torus.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime), 'wb') as output1:
             pickle.dump(tr_losseses, output1)
-        with open('{}accses_SCHEME_{}_P_{:.4f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_2-D_torus.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime), 'wb') as output2:
-            pickle.dump(tst_accses, output2)
+        # with open('{}accses_SCHEME_{}_P_{:.4f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_2-D_torus.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime), 'wb') as output2:
+        #     pickle.dump(tst_accses, output2)
         
         if scheme == 6:
             with open('{}cons_e_SCHEME_{}_P_{:.4f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime), 'wb') as output3:
