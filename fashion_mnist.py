@@ -61,17 +61,17 @@ def train( scheme, P, N, a, initial_cr, a_prime ):
     rho =  d_min + (d_max - d_min) * np.random.rand(K,1) 
     theta = 2 * np.pi * np.random.rand(K,1)
     # D = np.ones((K, K))
-    Dist = np.sqrt(rho ** 2 + rho.T ** 2 - 2 * (rho @ rho.T) * np.cos(theta - theta.T))
+    D = np.sqrt(rho ** 2 + rho.T ** 2 - 2 * (rho @ rho.T) * np.cos(theta - theta.T))
     # Fill in D[i,i] some non-zero value to avoid Inf in PL
     for i in range(K):
         if i:
-            Dist[i,i] = Dist[i,i-1]
+            D[i,i] = D[i,i-1]
         else:
-            Dist[i,i] = Dist[i,i+1]
+            D[i,i] = D[i,i+1]
     A0 = 10 ** (-3.35)
     d0 = 1
     gamma = 3.76
-    PL = A0 * ((Dist / d0) ** (-gamma)) 
+    PL = A0 * ((D / d0) ** (-gamma)) 
     # average SNR is ~10*np.log10(P / N0 * M * mean(temp)) 
     # where mean(temp)=sum(temp)/len(G.nodes()) with temp = [min(PL[i,j]  for j in G[node]) for node in G.nodes()] (~4.11e-12 in this example)
 
@@ -128,7 +128,7 @@ def train( scheme, P, N, a, initial_cr, a_prime ):
             # # Generate an arbitrary ER graph
             # G = net.erdos_renyi_graph(K, p, seed = next(seeds))
 
-            # # Generate a ring(cycle) graph
+            # # Generate a chain graph
             # G = net.cycle_graph(K)
             # G.remove_edge(0, K-1)
 
@@ -141,10 +141,10 @@ def train( scheme, P, N, a, initial_cr, a_prime ):
             # G = net.complete_graph(K)
 
             L = np.array(net.laplacian_matrix(G, nodelist = range(K)).todense())
-            Dist, _ = np.linalg.eigh(L) # eigenvalues are assumed given in an ascending order
-            alg_connect = Dist[1] 
+            E, _ = np.linalg.eigh(L) # eigenvalues are assumed given in an ascending order
+            alg_connect = E[1] 
         # W, _ = solve_graph_weights(K, E)
-        alpha = 2 / (Dist[K-1] + Dist[1])
+        alpha = 2 / (E[K-1] + E[1])
         W = np.eye(K) - alpha * L
         # _, Chi = TwoSectionH(G) 
 
@@ -270,11 +270,11 @@ def train( scheme, P, N, a, initial_cr, a_prime ):
                 ############ A-DSGD based on dynamic coloring of the 2-section hypergraph ################
                 elif scheme == 4:
                     # noise =  np.sqrt(N0 / 2) * np.random.randn(K, s) + 1j * np.sqrt(N0 / 2) * np.random.randn(K, s)
-                    theta_next_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices = ans.proposed_DSGD(G, flattened_theta_by_devices, flattened_theta_half_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices, W, zeta, CH, N, schedule_list, Tx_times, H_par, P, N0 = 10 ** (-169/10) * 1e-3)
+                    theta_next_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices = ans.proposed_DSGD(G, flattened_theta_by_devices, flattened_theta_half_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices, W, zeta, CH, N, schedule_list, Tx_times, H_par, P)
                 ############ A-DSGD based on TDMA ################
                 elif scheme == 5:
                     theta_next_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices = ans.TDMA_DSGD(G, flattened_theta_half_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices, W, zeta, CH, N, H_par, P)
-                ############ A-DSGD keeping track of the error ################
+                ############ A-DSGD keeping track of the errors ################
                 elif scheme == 6:
                     theta_next_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices, cons_error, comp_error, noise_error_by_devices = ans.proposed_DSGD(G, flattened_theta_by_devices, flattened_theta_half_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices, W, zeta, CH, N, schedule_list, Tx_times, H_par, P, flag = True)
                     cons_errors[n].append(cons_error)
@@ -282,10 +282,10 @@ def train( scheme, P, N, a, initial_cr, a_prime ):
                     noise_errors[n].append(noise_error_by_devices)
 
                     print("Round{}: consensus error {:.2f}".format(t // com_interval, cons_error))
-                    print("Round{}: compression error {:.2f}".format(t // com_interval, comp_error))
+                    # print("Round{}: compression error {:.2f}".format(t // com_interval, comp_error))
                     df = pd.DataFrame(noise_errors[n], columns = ['Device_{}'.format(i + 1) for i in range(K)] )
                     # !!! Note that one m has already been multiplied by N0 when calculating noise_error_by_devices
-                    acc_noise_error = zeta**2 * (m/d) * (2 - m/d) * (df.sum().sum())
+                    acc_noise_error = (zeta**2) * (2 - m/d) * (m**2/d) * (df.sum().sum())
                     print("Round{}: AWGN error {:.2f}".format(t // com_interval, acc_noise_error))
             else: # local training step
                 theta_next_by_devices = var_lists_by_devices
@@ -364,12 +364,12 @@ def train( scheme, P, N, a, initial_cr, a_prime ):
 def main():
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--scheme', type=int, default=2)
-    parser.add_argument('--P', type=float, default=2e-6)
+    parser.add_argument('--scheme', type=int, default=6)
+    parser.add_argument('--P', type=float, default=2e-7)
     parser.add_argument('--N', type=float, default=7943)
-    parser.add_argument('--a', type=float, default=1000)
-    parser.add_argument('--zeta0', type=float, default=0.005)
-    parser.add_argument('--a_prime', type=float, default=100)
+    parser.add_argument('--a', type=float, default=200)
+    parser.add_argument('--zeta0', type=float, default=0.050)
+    parser.add_argument('--a_prime', type=float, default=1000)
 
     args = parser.parse_args()
 

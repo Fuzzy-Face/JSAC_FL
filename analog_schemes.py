@@ -6,7 +6,7 @@ import gc
 
 # N0 = 10 ** (-169/10) * 1e-3
 def proposed_DSGD(G, flattened_theta_by_devices, flattened_theta_half_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices, 
-                    W, zeta, CH, N, schedule_list, Tx_times, H_par, P, flag = False, N0 = 10 ** (-169/10) * 1e-3, d = 7850, tilde_d = 2 ** 13):
+                    W, zeta, CH, N, schedule_list, Tx_times, H_par, barP, flag = False, N0 = 10 ** (-169/10) * 1e-3, d = 7850, tilde_d = 2 ** 13):
     K = len(G.nodes())
     CG = np.abs(CH) ** 2
 
@@ -20,17 +20,16 @@ def proposed_DSGD(G, flattened_theta_by_devices, flattened_theta_half_by_devices
     # A list (device_i's) of model differences that device i prepares to send to its neighbours
     model_diff = [flattened_theta_half_by_devices[i] - flattened_hat_theta_by_devices[i]
                             for i in range(K)] 
-    # A list (device_i's) of compressed signal that device i prepares to send to its neighbours before (transmitting) power scaling
+    # A list (device_i's) of compressed signal that device i prepares to send to its neighbours before power scaling
     phi = [ A @  np.concatenate((model_diff[i], np.zeros( (tilde_d- d,) )), axis = 0) for i in range(K)] 
-    barP = P / N
-    
-    # Calculate the transmit power sacling factor gamma_i for device i's scheduled neighbors and the transmit power scaling factor alpha_i for device i itself (as the BC node) when device i is scheduled as the star center 
+
+    # Calculate the channel aligning factor gamma_i for device i's serving neighbors (in the AirComp mode) and the power scaling factor alpha_i for device i itself (in the BC node) when device i is scheduled as the star center 
     gamma = {}
     alpha = {}
     for i in range(len(schedule_list)):
         for star in schedule_list[i]:
-            gamma[star] = min( barP * N /sum(Tx_times[j]) * CG[j,star] / ( (np.abs(W[star,j])**2) * (np.linalg.norm(phi[j],2)**2) ) for j in schedule_list[i][star] )
-            alpha[star] = barP * N /sum(Tx_times[star]) / np.linalg.norm(phi[star],2)**2
+            gamma[star] = min( barP * N /sum(Tx_times[j]) * CG[j,star] / ( (np.abs(W[star,j])**2) * (np.linalg.norm(model_diff[j],2)**2) ) for j in schedule_list[i][star] )
+            alpha[star] = barP * N /sum(Tx_times[star]) / np.linalg.norm(model_diff[star],2)**2
 
     # Calculate the #times for which device i receives, i.e., # of added AWGN
     Rx_times ={node:sum(Tx_times[node]) for node in G.nodes()}
@@ -41,7 +40,7 @@ def proposed_DSGD(G, flattened_theta_by_devices, flattened_theta_half_by_devices
 
     # (1st step) Process the received signal, by, e.g., re-scaling for decoding
     post_y_by_devices = []
-    # Keep record of a list (device_i's) of N_0/\gamma_i(t) = \sum_{s=1}^{#Rx_times[node]}N_0/\gamma_i^{(s)}(t),
+    # Keep record of a list (device_i's) of tilde N_{0i}^{(t)},
     # which can be cumsum across time to obtain the list (device_i's) of accumulated error caused by AWGN
     noise_error_by_devices = []
     for node in range(K):
@@ -49,17 +48,18 @@ def proposed_DSGD(G, flattened_theta_by_devices, flattened_theta_half_by_devices
         noise_error = 0
         if node in gamma:
             post_y += next(noise[node]) / np.sqrt(gamma[node])
-            noise_error += m * N0 / gamma[node]
+            noise_error += N0 / 2 / gamma[node]
             for schedule in schedule_list:
                 AirCompSetof_node = schedule.get(node)
                 if AirCompSetof_node:
                     break
         else:
             AirCompSetof_node = {}
+
         for i in G[node]:
             if i not in AirCompSetof_node:
                 post_y += W[node,i] * next(noise[node]) / ( CH[i,node] * np.sqrt(alpha[i]) )
-                noise_error += W[node,i]**2 * m * N0 / (np.abs(CH[i,node])**2 * alpha[i])
+                noise_error +=  N0 / 2 * (W[node,i]**2) / (np.abs(CH[i,node])**2 * alpha[i])
         post_y_by_devices.append(post_y)
         noise_error_by_devices.append(noise_error)
 
@@ -71,11 +71,11 @@ def proposed_DSGD(G, flattened_theta_by_devices, flattened_theta_half_by_devices
     # RLC_error = [ np.linalg.norm((m/d * A.T @ np.real(post_y_by_devices[i]))[:d] - sum( W[i,j] * model_diff[j] for j in G[i] ), 2)**2 / np. linalg.norm(sum( W[i,j] * model_diff[j] for j in G[i] ), 2)**2 
     #                 for i in range(K) ]
     # print("Normalized MSE(dB):", "|".join("{:.2f}".format(10 * np.log10(RLC_error[i])) for i in range(K)))
-
+    # flag indicates whether or not to keep track of the breakdown of errors
     if flag:
         flattened_avg_theta = sum(flattened_theta_by_devices) / K
         cons_error = sum([ np.linalg.norm(flattened_avg_theta - flattened_theta_by_devices[i], 2)**2 for i in range(K) ]) / K
-        comp_error = sum([ np.linalg.norm(flattened_hat_theta_by_devices[i]- flattened_theta_by_devices[i], 2)**2 for i in range(K) ]) / K
+        comp_error = sum([ np.linalg.norm(flattened_hat_theta_by_devices[i]- flattened_theta_half_by_devices[i], 2)**2 for i in range(K) ]) / K
 
     
     # flattened_theta_next_by_devices turns out to be a list (device_i's) of aggregate theta_i's after the consensus update)
@@ -94,12 +94,12 @@ def proposed_DSGD(G, flattened_theta_by_devices, flattened_theta_half_by_devices
 
 
 
-def TDMA_DSGD(G, flattened_theta_half_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices, W, zeta, CH, N, H_par, P, N0 = 10 ** (-169/10) * 1e-3, d = 7850, tilde_d = 2 ** 13):
+def TDMA_DSGD(G, flattened_theta_half_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices, W, zeta, CH, N, H_par, barP, N0 = 10 ** (-169/10) * 1e-3, d = 7850, tilde_d = 2 ** 13):
     K = len(G.nodes())
     CG = np.abs(CH) ** 2
 
     m = H_par.shape[0]
-    r = np.random.binomial(1, .5, (tilde_d,))
+    r = np.random.binomial(1, .5, (tilde_d,)) # The RV is the #of succseful trials
     r[r == 0] = -1
     temp = [H_par[i,:] * r for i in range(m)]
     A = (1 / np.sqrt(m)) * np.array(temp) # A^{(t)} is of shape (m, d)
@@ -110,10 +110,9 @@ def TDMA_DSGD(G, flattened_theta_half_by_devices, flattened_hat_theta_by_devices
                             for i in range(K)] 
     # A list (device_i's) of compressed signal that device i prepares to send to its neighbours before (transmitting) power scaling
     phi = [ A @  np.concatenate((model_diff[i], np.zeros( (tilde_d- d,) )), axis = 0) for i in range(K)] 
-    barP = P / N
-    
+
     # Calculate the transmit power sacling factor gamma_i for device i's scheduled neighbors and the transmit power scaling factor alpha_i for device i itself (as the BC node) when device i is scheduled as the star center 
-    gamma = [ min( barP * N /len(G[j]) * CG[j,i] / ( (np.abs(W[i,j])**2) * (np.linalg.norm(phi[j],2)**2) ) for j in G[i] )
+    gamma = [ min( barP * N /len(G[j]) * CG[j,i] / ( (np.abs(W[i,j])**2) * (np.linalg.norm(model_diff[j],2)**2) ) for j in G[i] )
                     for i in range(K)]
 
     # Generate random noise for device i
@@ -138,7 +137,7 @@ def TDMA_DSGD(G, flattened_theta_half_by_devices, flattened_hat_theta_by_devices
                                                 zeta * ( W[i,i]*flattened_hat_theta_by_devices[i] + hat_y_by_devices[i] -
                                                         flattened_hat_theta_by_devices[i] ) 
                                                     for i in range(K) ]
-                                                    
+
     # Unflatten the theta_next's in a list (device_i's) of [theta_{i}^{W}, theta_{i}^{b}]
     theta_next_by_devices = [[flattened_theta_next_by_devices[i][:7840].reshape((784,10)),  
                                 flattened_theta_next_by_devices[i][7840:]] for i in range(K)] 
