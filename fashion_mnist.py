@@ -111,7 +111,7 @@ def train( scheme, P, N, a, initial_cr, a_prime ):
     # thetases = [[] for i in range(training_times)]
     if scheme == 6:
         # cons_errors/comp_errors is of shape (training_times, ComRound, 1)
-        # noise_errors is of shape (training_times, ComRound, 1)
+        # noise_errors is of shape (training_times, ComRound, K)
         cons_errors, comp_errors, noise_errors = [[] for i in range(training_times)], [[] for i in range(training_times)], [[] for i in range(training_times)] 
 
     for n in range(training_times): # n is the index for the times of training
@@ -171,9 +171,6 @@ def train( scheme, P, N, a, initial_cr, a_prime ):
                 M = 2 * len(schedule_list)
                 m = int(N / M) 
                 H_par = H[:m] 
-                # Initialize the \theta_i^{(t)}'s as [\theta_{i,W}=np.zeros((784,10)), \theta_{i,b}=np.zeros((10,))]
-                # for the purpose of keeping track of the consensus and the compression error
-                theta_next_by_devices = [ [np.zeros((784,10)), np.zeros((10,))] for i in range(K)]  
             elif scheme == 5:
                 m = int(N / K) 
                 H_par = H[:m]
@@ -181,6 +178,9 @@ def train( scheme, P, N, a, initial_cr, a_prime ):
             if scheme == 4 or scheme == 5 or scheme == 6:
                 # Initialize the \hat{y}_i^{(t)}'s as zeros
                 hat_y_by_devices = [np.zeros((d,)) for i in range(K)] 
+                # Initialize the \theta_i^{(t)}'s as [\theta_{i,W}=np.zeros((784,10)), \theta_{i,b}=np.zeros((10,))]
+                # for the purpose of keeping track of the consensus and the compression error
+                theta_next_by_devices = [ [np.zeros((784,10)), np.zeros((10,))] for i in range(K)]  
 
             if scheme == 2:
                 _, from_node_to_color_id = TwoSectionH(G)
@@ -285,7 +285,7 @@ def train( scheme, P, N, a, initial_cr, a_prime ):
                     # print("Round{}: compression error {:.2f}".format(t // com_interval, comp_error))
                     df = pd.DataFrame(noise_errors[n], columns = ['Device_{}'.format(i + 1) for i in range(K)] )
                     # !!! Note that one m has already been multiplied by N0 when calculating noise_error_by_devices
-                    acc_noise_error = (zeta**2) * (2 - m/d) * (m**2/d) * (df.sum().sum())
+                    acc_noise_error = (zeta**2) * (m**2/d) * (df.sum().sum())
                     print("Round{}: AWGN error {:.2f}".format(t // com_interval, acc_noise_error))
             else: # local training step
                 theta_next_by_devices = var_lists_by_devices
@@ -348,8 +348,8 @@ def train( scheme, P, N, a, initial_cr, a_prime ):
         #     pickle.dump(grad_normses, grads)
         with open('{}losseses_SCHEME_{}_P_{:.4f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_2-D_torus.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime), 'wb') as output1:
             pickle.dump(tr_losseses, output1)
-        # with open('{}accses_SCHEME_{}_P_{:.4f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_2-D_torus.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime), 'wb') as output2:
-        #     pickle.dump(tst_accses, output2)
+        with open('{}accses_SCHEME_{}_P_{:.4f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_2-D_torus.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime), 'wb') as output2:
+            pickle.dump(tst_accses, output2)
         
         if scheme == 6:
             with open('{}cons_e_SCHEME_{}_P_{:.4f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime), 'wb') as output3:
@@ -364,12 +364,12 @@ def train( scheme, P, N, a, initial_cr, a_prime ):
 def main():
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--scheme', type=int, default=6)
+    parser.add_argument('--scheme', type=int, default=4)
     parser.add_argument('--P', type=float, default=2e-7)
     parser.add_argument('--N', type=float, default=7943)
     parser.add_argument('--a', type=float, default=200)
-    parser.add_argument('--zeta0', type=float, default=0.050)
-    parser.add_argument('--a_prime', type=float, default=1000)
+    parser.add_argument('--zeta0', type=float, default=0.005)
+    parser.add_argument('--a_prime', type=float, default=200)
 
     args = parser.parse_args()
 

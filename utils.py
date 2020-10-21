@@ -278,7 +278,7 @@ def LMMSE_Rx(i, G, CH, A, alpha, Rsc, Rcc, N0 = 10 ** (-169/10) * 1e-3 ):
     return U
 
 def solve_num_per_class(num_lack_max, K):
-    X = np.zeros((10,K)) #X is an num_class-by-num_devices matrix indicating if device k collects data sample belonging to class i (X[n,k]=1)
+    X = np.zeros((10,K)) #X is an num_class-by-num_devices matrix indicating if device k collects data sample belonging to class n (X[n,k]=1)
     num_lack = np.random.random_integers(0,num_lack_max,(K,))
     for k in range(K):
         arr = np.ones((10,))
