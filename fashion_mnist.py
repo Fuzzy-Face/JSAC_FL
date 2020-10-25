@@ -104,7 +104,7 @@ def train( scheme, P, N, a, initial_cr, a_prime ):
     acc_fn = keras.metrics.SparseCategoricalAccuracy()
 
     seeds = iter(range(1000))
-    p = 0.1 # The probability that one edge is included in the connectivity graph as per the Erdos-Renyi (random) graph
+    p = 0.5 # The probability that one edge is included in the connectivity graph as per the Erdos-Renyi (random) graph
     # losseses and accses are of shape (training_times, ComRound, K)
     tr_losseses, tst_accses, grad_normses = [[] for i in range(training_times)] , [[] for i in range(training_times)], [[] for i in range(training_times)]
     # # thetases is of shape (training_times, ComRound, K, d)
