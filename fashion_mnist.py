@@ -76,7 +76,7 @@ def train( scheme, P, N, a, initial_cr, a_prime ):
     # where mean(temp)=sum(temp)/len(G.nodes()) with temp = [min(PL[i,j]  for j in G[node]) for node in G.nodes()] (~4.11e-12 in this example)
 
     com_interval = 1 # Also known as "H" in the SPARQ-SGD paper
-    training_times = 1 # There will be training_times of lists each with a different setup of blockages, each of which is of (ComRound, K)
+    training_times = 10 # There will be training_times of lists each with a different setup of blockages, each of which is of (ComRound, K)
     Tmax = 5000 # Maximum number of commun. rounds during each training session
     # T = 1
     # BW = .5 * 1e4
@@ -95,7 +95,7 @@ def train( scheme, P, N, a, initial_cr, a_prime ):
     decay_rate = 1
     learning_rate_fn = keras.optimizers.schedules.InverseTimeDecay(initial_lr,
                                                                     decay_steps, decay_rate)
-    decayed_cr = True
+    decayed_cr = False
     # initial_cr = 0.01
     # a = 5.0
     cs_rate_fn = lambda t: initial_cr / (1 + t/a_prime)
@@ -104,7 +104,7 @@ def train( scheme, P, N, a, initial_cr, a_prime ):
     acc_fn = keras.metrics.SparseCategoricalAccuracy()
 
     seeds = iter(range(1000))
-    p = 0.2 # The probability that one edge is included in the connectivity graph as per the Erdos-Renyi (random) graph
+    p = 0.1 # The probability that one edge is included in the connectivity graph as per the Erdos-Renyi (random) graph
     # losseses and accses are of shape (training_times, ComRound, K)
     tr_losseses, tst_accses, grad_normses = [[] for i in range(training_times)] , [[] for i in range(training_times)], [[] for i in range(training_times)]
     # # thetases is of shape (training_times, ComRound, K, d)
@@ -128,14 +128,17 @@ def train( scheme, P, N, a, initial_cr, a_prime ):
             # # Generate an arbitrary ER graph
             # G = net.erdos_renyi_graph(K, p, seed = next(seeds))
 
-            # # Generate a chain graph
-            # G = net.cycle_graph(K)
-            # G.remove_edge(0, K-1)
+            # Generate a chain (cycle) graph
+            G = net.cycle_graph(K)
+            G.remove_edge(0, K-1)
+            # Base an ER graph with prob on the chain graph to improve the spectral gap delta
+            ER = net.erdos_renyi_graph(K, p, seed = next(seeds))
+            G.add_edges_from(ER.edges())
 
-            # Generate a 2-D torus (5-by-4)
-            G = net.grid_2d_graph(5, 4, periodic=True)
-            mapping = { (m,n):4*m+n for m, n in G.nodes()}
-            _ = net.relabel_nodes(G, mapping, copy=False)
+            # # Generate a 2-D torus (5-by-4)
+            # G = net.grid_2d_graph(5, 4, periodic=True)
+            # mapping = { (m,n):4*m+n for m, n in G.nodes()}
+            # _ = net.relabel_nodes(G, mapping, copy=False)
 
             # # Generate a complete graph
             # G = net.complete_graph(K)
@@ -346,17 +349,17 @@ def train( scheme, P, N, a, initial_cr, a_prime ):
 
         # with open('{}grad_normses_SCHEME_{}.pkl'.format(path, scheme), 'wb') as grads:
         #     pickle.dump(grad_normses, grads)
-        with open('{}losseses_SCHEME_{}_P_{:.4f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_2-D_torus.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime), 'wb') as output1:
+        with open('{}losseses_SCHEME_{}_P_{:.6f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_ER-prob_{:.1f}.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime, p), 'wb') as output1:
             pickle.dump(tr_losseses, output1)
-        with open('{}accses_SCHEME_{}_P_{:.4f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_2-D_torus.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime), 'wb') as output2:
+        with open('{}accses_SCHEME_{}_P_{:.6f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_ER_prob_{:.1f}.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime, p), 'wb') as output2:
             pickle.dump(tst_accses, output2)
         
         if scheme == 6:
-            with open('{}cons_e_SCHEME_{}_P_{:.4f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime), 'wb') as output3:
+            with open('{}cons_e_SCHEME_{}_P_{:.6f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_2-D_torus.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime), 'wb') as output3:
                 pickle.dump(cons_errors, output3)
-            with open('{}comp_e_SCHEME_{}_P_{:.4f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime), 'wb') as output4:
+            with open('{}comp_e_SCHEME_{}_P_{:.6f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_2-D_torus.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime), 'wb') as output4:
                 pickle.dump(comp_errors, output4)
-            with open('{}noise_e_SCHEME_{}_P_{:.4f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime), 'wb') as output5:
+            with open('{}noise_e_SCHEME_{}_P_{:.6f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_2-D_torus.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime), 'wb') as output5:
                 pickle.dump(noise_errors, output5)
 
     # scp -r k1818742@login.rosalind.kcl.ac.uk:/scratch/users/k1818742/data/*.pkl /home/Helen/MyDocuments/visiting_research@KCL/D2D_DSGD/repo_jv/data/
@@ -364,11 +367,11 @@ def train( scheme, P, N, a, initial_cr, a_prime ):
 def main():
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--scheme', type=int, default=4)
-    parser.add_argument('--P', type=float, default=2e-7)
+    parser.add_argument('--scheme', type=int, default=3)
+    parser.add_argument('--P', type=float, default=2e-8)
     parser.add_argument('--N', type=float, default=7943)
     parser.add_argument('--a', type=float, default=200)
-    parser.add_argument('--zeta0', type=float, default=0.005)
+    parser.add_argument('--zeta0', type=float, default=0.0005)
     parser.add_argument('--a_prime', type=float, default=200)
 
     args = parser.parse_args()
