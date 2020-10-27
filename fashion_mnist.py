@@ -102,7 +102,7 @@ def train( scheme, P, N, a, initial_cr, a_prime, n ):
         # # Generate a star-based ER graph
         # ER = net.erdos_renyi_graph(K-1, p, seed = next(seeds))
         # ER.add_node(K-1)
-        G = net.star_graph(reversed(range(K)))
+        # G = net.star_graph(reversed(range(K)))
         # G.add_edges_from(ER.edges())
 
         # # Generate an arbitrary ER graph
@@ -115,10 +115,10 @@ def train( scheme, P, N, a, initial_cr, a_prime, n ):
         # ER = net.erdos_renyi_graph(K, p, seed = next(seeds))
         # G.add_edges_from(ER.edges())
 
-        # # Generate a 2-D torus (5-by-4)
-        # G = net.grid_2d_graph(5, 4, periodic=True)
-        # mapping = { (m,n):4*m+n for m, n in G.nodes()}
-        # _ = net.relabel_nodes(G, mapping, copy=False)
+        # Generate a 2-D torus (5-by-4)
+        G = net.grid_2d_graph(5, 4, periodic=True)
+        mapping = { (m,n):4*m+n for m, n in G.nodes()}
+        _ = net.relabel_nodes(G, mapping, copy=False)
 
         # # Generate a complete graph
         # G = net.complete_graph(K)
@@ -348,9 +348,9 @@ def train( scheme, P, N, a, initial_cr, a_prime, n ):
 
     # with open('{}grad_normses_SCHEME_{}.pkl'.format(path, scheme), 'wb') as grads:
     #     pickle.dump(grad_normses, grads)
-    with open('{}losseses_SCHEME_{}_P_{:.6f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_star_equal_n-{:d}.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime, n), 'wb') as output1:
+    with open('{}losseses_SCHEME_{}_P_{:.6f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_CG_equal_n-{:d}.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime, n), 'wb') as output1:
         pickle.dump(tr_losseses, output1)
-    with open('{}accses_SCHEME_{}_P_{:.6f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_star_equal_n-{:d}.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime, n), 'wb') as output2:
+    with open('{}accses_SCHEME_{}_P_{:.6f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_CG_equal_n-{:d}.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime, n), 'wb') as output2:
         pickle.dump(tst_accses, output2)
     
     if scheme == 6:
