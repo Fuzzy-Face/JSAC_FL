@@ -13,7 +13,7 @@ import analog_schemes as ans
 # from scipy.sparse import identity, csr_matrix
 
 
-def train( scheme, P, N, a, initial_cr, a_prime, n ):
+def train( scheme, top, P, N, a, initial_cr, a_prime, n ):
 
     (train_images, train_labels), (test_images,
                                 test_labels) = keras.datasets.fashion_mnist.load_data()
@@ -83,8 +83,8 @@ def train( scheme, P, N, a, initial_cr, a_prime, n ):
     loss_fn = keras.losses.SparseCategoricalCrossentropy()
     acc_fn = keras.metrics.SparseCategoricalAccuracy()
 
-    # seeds = iter(range(1000))
-    # p = 0.1 # The probability that one edge is included in the connectivity graph as per the Erdos-Renyi (random) graph
+    seeds = iter(range(1000))
+    p = 0.1 # The probability that one edge is included in the connectivity graph as per the Erdos-Renyi (random) graph
     # losseses and accses are of shape (training_times, ComRound, K)
     tr_losseses, tst_accses, grad_normses = [[] for i in range(training_times)] , [[] for i in range(training_times)], [[] for i in range(training_times)]
     # # thetases is of shape (training_times, ComRound, K, d)
@@ -96,38 +96,55 @@ def train( scheme, P, N, a, initial_cr, a_prime, n ):
 
     # for n in range(training_times): # n is the index for the times of training
     print("The {}th time of training:".format(n))
-    # Generate a random graph model suffering from blockages under Erdos Renyi Model
-    alg_connect = 0
-    while alg_connect < 1e-4:
-        # # Generate a star-based ER graph
-        # ER = net.erdos_renyi_graph(K-1, p, seed = next(seeds))
-        # ER.add_node(K-1)
-        # G = net.star_graph(reversed(range(K)))
-        # G.add_edges_from(ER.edges())
+    # Generate a (random) graph model suffering from blockages under Erdos Renyi Model
+    if top == 'star-ER':
+        # Generate a star-based ER graph
+        ER = net.erdos_renyi_graph(K-1, p, seed = next(seeds))
+        G = net.star_graph(reversed(range(K)))
+        G.add_edges_from(ER.edges())
+        
+    elif top == 'star':
+        # Generate a star graph
+        G = net.star_graph(reversed(range(K)))
+    
+    elif top == 'ER':
+        alg_connect = 0
+        while alg_connect < 1e-4:
+            # Generate an arbitrary ER graph
+            G = net.erdos_renyi_graph(K, p, seed = next(seeds))
+            L = np.array(net.laplacian_matrix(G, nodelist = range(K)).todense())
+            E, _ = np.linalg.eigh(L) # eigenvalues are assumed given in an ascending order
+            alg_connect = E[1] 
 
-        # # Generate an arbitrary ER graph
-        # G = net.erdos_renyi_graph(K, p, seed = next(seeds))
+    elif top == 'chain-ER':
+        # Generate a chain-based ER graph
+        ER = net.erdos_renyi_graph(K, p, seed = next(seeds))
+        G = net.cycle_graph(K)
+        G.remove_edge(0, K-1)
+        G.add_edges_from(ER.edges())
 
-        # # Generate a chain (cycle) graph
-        # G = net.cycle_graph(K)
-        # G.remove_edge(0, K-1)
-        # # Base an ER graph on the chain graph with prob. p to improve the spectral gap delta
-        # ER = net.erdos_renyi_graph(K, p, seed = next(seeds))
-        # G.add_edges_from(ER.edges())
+    elif top == 'chain':
+        # Generate a chain (cycle) graph
+        G = net.cycle_graph(K)
+        G.remove_edge(0, K-1)
 
+    elif top == 'torus':
         # Generate a 2-D torus (5-by-4)
         G = net.grid_2d_graph(5, 4, periodic=True)
         mapping = { (m,n):4*m+n for m, n in G.nodes()}
         _ = net.relabel_nodes(G, mapping, copy=False)
 
-        # # Generate a complete graph
-        # G = net.complete_graph(K)
-
+    elif top == 'CG':
+        # Generate a complete graph
+        G = net.complete_graph(K)
+    # If there is no Eigenvalues for the Laplacian matrix that has been calculated
+    #  
+    try:
+        alpha = 2 / (E[K-1] + E[1])
+    except NameError:
         L = np.array(net.laplacian_matrix(G, nodelist = range(K)).todense())
         E, _ = np.linalg.eigh(L) # eigenvalues are assumed given in an ascending order
-        alg_connect = E[1] 
-    # W, _ = solve_graph_weights(K, E)
-    alpha = 2 / (E[K-1] + E[1])
+        alpha = 2 / (E[K-1] + E[1])
     W = np.eye(K) - alpha * L
     # _, Chi = TwoSectionH(G) 
 
@@ -348,17 +365,17 @@ def train( scheme, P, N, a, initial_cr, a_prime, n ):
 
     # with open('{}grad_normses_SCHEME_{}.pkl'.format(path, scheme), 'wb') as grads:
     #     pickle.dump(grad_normses, grads)
-    with open('{}losseses_SCHEME_{}_P_{:.6f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_CG_equal_n-{:d}.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime, n), 'wb') as output1:
+    with open('{}losseses_SCHEME_{}_P_{:.6f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_{}_equal_n-{:d}.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime, top, n), 'wb') as output1:
         pickle.dump(tr_losseses, output1)
-    with open('{}accses_SCHEME_{}_P_{:.6f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_CG_equal_n-{:d}.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime, n), 'wb') as output2:
+    with open('{}accses_SCHEME_{}_P_{:.6f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_{}_equal_n-{:d}.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime, top, n), 'wb') as output2:
         pickle.dump(tst_accses, output2)
     
     if scheme == 6:
-        with open('{}cons_e_SCHEME_{}_P_{:.6f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_2-D_torus.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime), 'wb') as output3:
+        with open('{}cons_e_SCHEME_{}_P_{:.6f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_{}_equal_n-{:d}.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime, top, n), 'wb') as output3:
             pickle.dump(cons_errors, output3)
-        with open('{}comp_e_SCHEME_{}_P_{:.6f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_2-D_torus.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime), 'wb') as output4:
+        with open('{}comp_e_SCHEME_{}_P_{:.6f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_{}_equal_n-{:d}.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime, top, n), 'wb') as output4:
             pickle.dump(comp_errors, output4)
-        with open('{}noise_e_SCHEME_{}_P_{:.6f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_2-D_torus.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime), 'wb') as output5:
+        with open('{}noise_e_SCHEME_{}_P_{:.6f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_{}_equal_n-{:d}.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime, top, n), 'wb') as output5:
             pickle.dump(noise_errors, output5)
 
     # scp -r k1818742@login.rosalind.kcl.ac.uk:/scratch/users/k1818742/data/*.pkl /home/Helen/MyDocuments/visiting_research@KCL/D2D_DSGD/repo_jv/data/
@@ -367,6 +384,7 @@ def main():
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--scheme', type=int, default=3)
+    parser.add_argument('--topology', type=str, default='CG')
     parser.add_argument('--P', type=float, default=2e-7)
     parser.add_argument('--N', type=float, default=20000)
     parser.add_argument('--a', type=float, default=200)
@@ -376,7 +394,7 @@ def main():
 
     args = parser.parse_args()
 
-    train( args.scheme, args.P, args.N, args.a, args.zeta0, args.a_prime, args.nth )
+    train( args.scheme, args.topology, args.P, args.N, args.a, args.zeta0, args.a_prime, args.nth )
 
 
 
