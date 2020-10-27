@@ -95,7 +95,7 @@ def dig_sparse_level(G, CG, N, Chi, P, log2_comb_list, N0 = 10 ** (-169/10) * 1e
 
 def dig_comp_level(G, CG, N, Chi, barP, N0 = 10 ** (-169/10) * 1e-3, b = 64, d = 7850):
     K = CG.shape[0]
-    m_array = [int( N / Chi * np.log2(1 + barP * Chi / N0 * min(CG[i,[j-1 for j in G[i]]])) / b ) for i in range(K)]
+    m_array = [int( N / Chi * np.log2(1 + barP * Chi / N0 * min(CG[i,[j for j in G[i]]])) / b ) for i in range(K)]
     m_array = np.maximum(np.minimum(np.array(m_array), d), 1)
 
     return m_array
