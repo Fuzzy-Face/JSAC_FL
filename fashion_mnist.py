@@ -13,7 +13,7 @@ import analog_schemes as ans
 # from scipy.sparse import identity, csr_matrix
 
 
-def train( scheme, top, P, N, a, initial_cr, a_prime, n ):
+def train( scheme, top, P, N, a, initial_cr, a_prime, nth ):
 
     (train_images, train_labels), (test_images,
                                 test_labels) = keras.datasets.fashion_mnist.load_data()
@@ -95,7 +95,7 @@ def train( scheme, top, P, N, a, initial_cr, a_prime, n ):
         cons_errors, comp_errors, noise_errors = [[] for i in range(training_times)], [[] for i in range(training_times)], [[] for i in range(training_times)] 
 
     # for n in range(training_times): # n is the index for the times of training
-    print("The {}th time of training:".format(n))
+    print("The {}th time of training:".format(nth))
     # Generate a (random) graph model suffering from blockages under Erdos Renyi Model
     if top == 'star-ER':
         # Generate a star-based ER graph
@@ -148,7 +148,7 @@ def train( scheme, top, P, N, a, initial_cr, a_prime, n ):
     W = np.eye(K) - alpha * L
     # _, Chi = TwoSectionH(G) 
 
-    # # Set distances among any pair of nodes
+    # Set distances among any pair of nodes
     # d_min = 50
     # d_max = 200
     # rho =  d_min + (d_max - d_min) * np.random.rand(K,1) 
@@ -167,7 +167,7 @@ def train( scheme, top, P, N, a, initial_cr, a_prime, n ):
     PL = A0 * ((D / d0) ** (-gamma)) 
 
     # Generate random channels for unblocked edges of the given graph
-    np.random.seed(n)
+    np.random.seed(nth)
     CH_gen = np.random.randn(Tmax, K, K)/np.sqrt(2) + 1j * np.random.randn(Tmax, K, K)/np.sqrt(2)
     # with open('./data/simulations/channels_Tmax_{:.0f}_{:.0f}-{:.0f}.pkl'.format(Tmax, training_times, n), 'wb') as channels:
     #     pickle.dump(CH_gen, channels) 
@@ -296,13 +296,13 @@ def train( scheme, top, P, N, a, initial_cr, a_prime, n ):
             ############ A-DSGD keeping track of the errors ################
             elif scheme == 6:
                 theta_next_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices, cons_error, comp_error, noise_error_by_devices = ans.proposed_DSGD(G, flattened_theta_by_devices, flattened_theta_half_by_devices, flattened_hat_theta_by_devices, hat_y_by_devices, W, zeta, CH, N, schedule_list, Tx_times, H_par, P, flag = True)
-                cons_errors[n].append(cons_error)
-                comp_errors[n].append(comp_error)
-                noise_errors[n].append(noise_error_by_devices)
+                cons_errors[nth].append(cons_error)
+                comp_errors[nth].append(comp_error)
+                noise_errors[nth].append(noise_error_by_devices)
 
                 print("Round{}: consensus error {:.2f}".format(t // com_interval, cons_error))
                 # print("Round{}: compression error {:.2f}".format(t // com_interval, comp_error))
-                df = pd.DataFrame(noise_errors[n], columns = ['Device_{}'.format(i + 1) for i in range(K)] )
+                df = pd.DataFrame(noise_errors[nth], columns = ['Device_{}'.format(i + 1) for i in range(K)] )
                 # !!! Note that one m has already been multiplied by N0 when calculating noise_error_by_devices
                 acc_noise_error = (zeta**2) * (m**2/d) * (df.sum().sum())
                 print("Round{}: AWGN error {:.2f}".format(t // com_interval, acc_noise_error))
@@ -342,9 +342,9 @@ def train( scheme, top, P, N, a, initial_cr, a_prime, n ):
             acc_fn.reset_states()
 
             # keep track of the training losses by devices (K,) per iteration
-            tr_losseses[n].append(tr_losses)
+            tr_losseses[nth].append(tr_losses)
             # keep track of the test accuracy per iteration
-            tst_accses[n].append(tst_accs.numpy())
+            tst_accses[nth].append(tst_accs.numpy())
 
             # print("Round{}".format(t // com_interval), "|".join("{:.3f}".format(x)
             #                     for x in tr_losses))
@@ -354,7 +354,7 @@ def train( scheme, top, P, N, a, initial_cr, a_prime, n ):
             print("Round{}: accuracy level {:.4f}".format(t // com_interval, tst_accs))
 
             # keep track of the 2-norm gradients by devices (K,) per iteration
-            grad_normses[n].append(grad_norm_by_devices)
+            grad_normses[nth].append(grad_norm_by_devices)
 
 
     import sys
@@ -365,17 +365,17 @@ def train( scheme, top, P, N, a, initial_cr, a_prime, n ):
 
     # with open('{}grad_normses_SCHEME_{}.pkl'.format(path, scheme), 'wb') as grads:
     #     pickle.dump(grad_normses, grads)
-    with open('{}losseses_SCHEME_{}_P_{:.6f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_{}_equal_n-{:d}.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime, top, n), 'wb') as output1:
+    with open('{}losseses_SCHEME_{}_P_{:.6f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_{}_equal_n-{:d}.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime, top, nth), 'wb') as output1:
         pickle.dump(tr_losseses, output1)
-    with open('{}accses_SCHEME_{}_P_{:.6f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_{}_equal_n-{:d}.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime, top, n), 'wb') as output2:
-        pickle.dump(tst_accses, output2)
+    # with open('{}accses_SCHEME_{}_P_{:.6f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_{}_equal_n-{:d}.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime, top, nth), 'wb') as output2:
+    #     pickle.dump(tst_accses, output2)
     
     if scheme == 6:
-        with open('{}cons_e_SCHEME_{}_P_{:.6f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_{}_equal_n-{:d}.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime, top, n), 'wb') as output3:
+        with open('{}cons_e_SCHEME_{}_P_{:.6f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_{}_equal_n-{:d}.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime, top, nth), 'wb') as output3:
             pickle.dump(cons_errors, output3)
-        with open('{}comp_e_SCHEME_{}_P_{:.6f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_{}_equal_n-{:d}.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime, top, n), 'wb') as output4:
+        with open('{}comp_e_SCHEME_{}_P_{:.6f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_{}_equal_n-{:d}.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime, top, nth), 'wb') as output4:
             pickle.dump(comp_errors, output4)
-        with open('{}noise_e_SCHEME_{}_P_{:.6f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_{}_equal_n-{:d}.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime, top, n), 'wb') as output5:
+        with open('{}noise_e_SCHEME_{}_P_{:.6f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_{}_equal_n-{:d}.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime, top, nth), 'wb') as output5:
             pickle.dump(noise_errors, output5)
 
     # scp -r k1818742@login.rosalind.kcl.ac.uk:/scratch/users/k1818742/data/*.pkl /home/Helen/MyDocuments/visiting_research@KCL/D2D_DSGD/repo_jv/data/
@@ -384,12 +384,12 @@ def main():
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--scheme', type=int, default=3)
-    parser.add_argument('--topology', type=str, default='CG')
+    parser.add_argument('--topology', type=str, default='torus')
     parser.add_argument('--P', type=float, default=2e-7)
     parser.add_argument('--N', type=float, default=20000)
     parser.add_argument('--a', type=float, default=200)
     parser.add_argument('--zeta0', type=float, default=0.0005)
-    parser.add_argument('--a_prime', type=float, default=200)
+    parser.add_argument('--a_prime', type=float, default=6)
     parser.add_argument('--nth', type=int, default=1)
 
     args = parser.parse_args()
