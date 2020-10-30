@@ -75,7 +75,7 @@ def train( scheme, top, P, N, a, initial_cr, a_prime, nth ):
     decay_rate = 1
     learning_rate_fn = keras.optimizers.schedules.InverseTimeDecay(initial_lr,
                                                                     decay_steps, decay_rate)
-    decayed_cr = False
+    decayed_cr = True
     # initial_cr = 0.01
     # a = 5.0
     cs_rate_fn = lambda t: initial_cr / (1 + t/a_prime)
@@ -371,11 +371,11 @@ def train( scheme, top, P, N, a, initial_cr, a_prime, nth ):
     #     pickle.dump(tst_accses, output2)
     
     if scheme == 6:
-        with open('{}cons_e_SCHEME_{}_P_{:.6f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_{}_equal_n-{:d}.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime, top, nth), 'wb') as output3:
+        with open('{}cons_e_SCHEME_{}_P_{:.6f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_{}_n-{:d}.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime, top, nth), 'wb') as output3:
             pickle.dump(cons_errors, output3)
-        with open('{}comp_e_SCHEME_{}_P_{:.6f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_{}_equal_n-{:d}.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime, top, nth), 'wb') as output4:
+        with open('{}comp_e_SCHEME_{}_P_{:.6f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_{}_n-{:d}.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime, top, nth), 'wb') as output4:
             pickle.dump(comp_errors, output4)
-        with open('{}noise_e_SCHEME_{}_P_{:.6f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_{}_equal_n-{:d}.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime, top, nth), 'wb') as output5:
+        with open('{}noise_e_SCHEME_{}_P_{:.6f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_{}_n-{:d}.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime, top, nth), 'wb') as output5:
             pickle.dump(noise_errors, output5)
 
     # scp -r k1818742@login.rosalind.kcl.ac.uk:/scratch/users/k1818742/data/*.pkl /home/Helen/MyDocuments/visiting_research@KCL/D2D_DSGD/repo_jv/data/
@@ -383,13 +383,13 @@ def train( scheme, top, P, N, a, initial_cr, a_prime, nth ):
 def main():
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--scheme', type=int, default=3)
-    parser.add_argument('--topology', type=str, default='torus')
+    parser.add_argument('--scheme', type=int, default=5)
+    parser.add_argument('--topology', type=str, default='chain')
     parser.add_argument('--P', type=float, default=2e-7)
     parser.add_argument('--N', type=float, default=20000)
-    parser.add_argument('--a', type=float, default=200)
-    parser.add_argument('--zeta0', type=float, default=0.0005)
-    parser.add_argument('--a_prime', type=float, default=6)
+    parser.add_argument('--a', type=float, default=1000)
+    parser.add_argument('--zeta0', type=float, default=0.1)
+    parser.add_argument('--a_prime', type=float, default=500)
     parser.add_argument('--nth', type=int, default=1)
 
     args = parser.parse_args()
