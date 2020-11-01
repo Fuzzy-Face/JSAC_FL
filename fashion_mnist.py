@@ -75,7 +75,7 @@ def train( scheme, top, P, N, a, initial_cr, a_prime, nth ):
     decay_rate = 1
     learning_rate_fn = keras.optimizers.schedules.InverseTimeDecay(initial_lr,
                                                                     decay_steps, decay_rate)
-    decayed_cr = True
+    decayed_cr = False
     # initial_cr = 0.01
     # a = 5.0
     cs_rate_fn = lambda t: initial_cr / (1 + t/a_prime)
@@ -353,8 +353,8 @@ def train( scheme, top, P, N, a, initial_cr, a_prime, nth ):
             #                     for x in tst_accs))
             print("Round{}: accuracy level {:.4f}".format(t // com_interval, tst_accs))
 
-            # keep track of the 2-norm gradients by devices (K,) per iteration
-            grad_normses[nth].append(grad_norm_by_devices)
+            # # keep track of the 2-norm gradients by devices (K,) per iteration
+            # grad_normses[nth].append(grad_norm_by_devices)
 
 
     import sys
@@ -383,13 +383,13 @@ def train( scheme, top, P, N, a, initial_cr, a_prime, nth ):
 def main():
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--scheme', type=int, default=5)
-    parser.add_argument('--topology', type=str, default='chain')
+    parser.add_argument('--scheme', type=int, default=1)
+    parser.add_argument('--topology', type=str, default='CG')
     parser.add_argument('--P', type=float, default=2e-7)
     parser.add_argument('--N', type=float, default=20000)
-    parser.add_argument('--a', type=float, default=1000)
-    parser.add_argument('--zeta0', type=float, default=0.1)
-    parser.add_argument('--a_prime', type=float, default=500)
+    parser.add_argument('--a', type=float, default=2000)
+    parser.add_argument('--zeta0', type=float, default=0.05)
+    parser.add_argument('--a_prime', type=float, default=200)
     parser.add_argument('--nth', type=int, default=1)
 
     args = parser.parse_args()
