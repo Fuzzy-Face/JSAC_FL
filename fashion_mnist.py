@@ -75,7 +75,7 @@ def train( scheme, top, P, N, a, initial_cr, a_prime, nth ):
     decay_rate = 1
     learning_rate_fn = keras.optimizers.schedules.InverseTimeDecay(initial_lr,
                                                                     decay_steps, decay_rate)
-    decayed_cr = False
+    decayed_cr = True
     # initial_cr = 0.01
     # a = 5.0
     cs_rate_fn = lambda t: initial_cr / (1 + t/a_prime)
@@ -149,18 +149,18 @@ def train( scheme, top, P, N, a, initial_cr, a_prime, nth ):
     # _, Chi = TwoSectionH(G) 
 
     # Set distances among any pair of nodes
-    # d_min = 50
-    # d_max = 200
-    # rho =  d_min + (d_max - d_min) * np.random.rand(K,1) 
-    # theta = 2 * np.pi * np.random.rand(K,1)
-    D = 125 * np.ones((K, K)) # mimic the effect of the same pathloss
-    # D = np.sqrt(rho ** 2 + rho.T ** 2 - 2 * (rho @ rho.T) * np.cos(theta - theta.T))
-    # # Fill in D[i,i] some non-zero value to avoid Inf in PL
-    # for i in range(K):
-    #     if i:
-    #         D[i,i] = D[i,i-1]
-    #     else:
-    #         D[i,i] = D[i,i+1]
+    # D = 125 * np.ones((K, K)) # mimic the effect of the same pathloss
+    d_min = 50
+    d_max = 200
+    rho =  d_min + (d_max - d_min) * np.random.rand(K,1) 
+    theta = 2 * np.pi * np.random.rand(K,1)
+    D = np.sqrt(rho ** 2 + rho.T ** 2 - 2 * (rho @ rho.T) * np.cos(theta - theta.T))
+    # Fill in D[i,i] some non-zero value to avoid Inf in PL
+    for i in range(K):
+        if i:
+            D[i,i] = D[i,i-1]
+        else:
+            D[i,i] = D[i,i+1]
     A0 = 10 ** (-3.35)
     d0 = 1
     gamma = 3.76
@@ -365,7 +365,7 @@ def train( scheme, top, P, N, a, initial_cr, a_prime, nth ):
 
     # with open('{}grad_normses_SCHEME_{}.pkl'.format(path, scheme), 'wb') as grads:
     #     pickle.dump(grad_normses, grads)
-    with open('{}losseses_SCHEME_{}_P_{:.6f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_{}_equal_n-{:d}.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime, top, nth), 'wb') as output1:
+    with open('{}losseses_SCHEME_{}_P_{:.6f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_{}_n-{:d}.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime, top, nth), 'wb') as output1:
         pickle.dump(tr_losseses, output1)
     # with open('{}accses_SCHEME_{}_P_{:.6f}mW_N_{:.0f}_a_{:.2f}_zeta0_{:.4f}_a_prime_{:.2f}_{}_equal_n-{:d}.pkl'.format(path, scheme, P*1e3, N, a, initial_cr, a_prime, top, nth), 'wb') as output2:
     #     pickle.dump(tst_accses, output2)
@@ -383,13 +383,13 @@ def train( scheme, top, P, N, a, initial_cr, a_prime, nth ):
 def main():
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--scheme', type=int, default=1)
-    parser.add_argument('--topology', type=str, default='CG')
-    parser.add_argument('--P', type=float, default=2e-7)
-    parser.add_argument('--N', type=float, default=20000)
-    parser.add_argument('--a', type=float, default=2000)
-    parser.add_argument('--zeta0', type=float, default=0.05)
-    parser.add_argument('--a_prime', type=float, default=200)
+    parser.add_argument('--scheme', type=int, default=4)
+    parser.add_argument('--topology', type=str, default='chain')
+    parser.add_argument('--P', type=float, default=2e-8)
+    parser.add_argument('--N', type=float, default=1000)
+    parser.add_argument('--a', type=float, default=200)
+    parser.add_argument('--zeta0', type=float, default=0.0005)
+    parser.add_argument('--a_prime', type=float, default=5000)
     parser.add_argument('--nth', type=int, default=1)
 
     args = parser.parse_args()
