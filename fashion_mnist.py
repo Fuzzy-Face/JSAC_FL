@@ -75,7 +75,7 @@ def train( scheme, top, P, N, a, initial_cr, a_prime, nth ):
     decay_rate = 1
     learning_rate_fn = keras.optimizers.schedules.InverseTimeDecay(initial_lr,
                                                                     decay_steps, decay_rate)
-    decayed_cr = False
+    decayed_cr = True
     # initial_cr = 0.01
     # a = 5.0
     cs_rate_fn = lambda t: initial_cr / (1 + t/a_prime)
@@ -188,10 +188,10 @@ def train( scheme, top, P, N, a, initial_cr, a_prime, nth ):
         if scheme == 4 or scheme == 6:
             schedule_list, Tx_times = seq_scheduling(G.copy())
             M = 2 * len(schedule_list)
-            m = int(N / M) 
+            m = min(int(N / M), H.shape[0]) 
             H_par = H[:m] 
         elif scheme == 5:
-            m = int(N / K) 
+            m = min(int(N / M), H.shape[0]) 
             H_par = H[:m]
 
         if scheme == 4 or scheme == 5 or scheme == 6:
@@ -386,7 +386,7 @@ def main():
     parser.add_argument('--scheme', type=int, default=4)
     parser.add_argument('--topology', type=str, default='chain')
     parser.add_argument('--P', type=float, default=2e-8)
-    parser.add_argument('--N', type=float, default=1000)
+    parser.add_argument('--N', type=float, default=100000)
     parser.add_argument('--a', type=float, default=200)
     parser.add_argument('--zeta0', type=float, default=0.0005)
     parser.add_argument('--a_prime', type=float, default=5000)
