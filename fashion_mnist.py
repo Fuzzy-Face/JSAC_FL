@@ -75,7 +75,7 @@ def train( scheme, top, P, N, a, initial_cr, a_prime, nth ):
     decay_rate = 1
     learning_rate_fn = keras.optimizers.schedules.InverseTimeDecay(initial_lr,
                                                                     decay_steps, decay_rate)
-    decayed_cr = True
+    decayed_cr = False
     # initial_cr = 0.01
     # a = 5.0
     cs_rate_fn = lambda t: initial_cr / (1 + t/a_prime)
