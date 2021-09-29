@@ -191,7 +191,7 @@ def train( scheme, top, P, N, a, initial_cr, a_prime, nth ):
             m = min(int(N / M), H.shape[0]) 
             H_par = H[:m] 
         elif scheme == 5:
-            m = min(int(N / M), H.shape[0]) 
+            m = min(int(N / K), H.shape[0]) 
             H_par = H[:m]
 
         if scheme == 4 or scheme == 5 or scheme == 6:
