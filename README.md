@@ -83,6 +83,6 @@ This repository includes the source code for the work "[Federated Learning over 
 }
 ```
 ## Contact Info
-- [Xing, Hong](https://scholar.google.com.sg/citations?user=rfhrifoAAAAJ&hl=en), e-mail: hong.xing AT szu.edu.cn
+- [Xing, Hong](https://scholar.google.com.sg/citations?user=rfhrifoAAAAJ&hl=en), e-mail: hongxing AT ust.hk
 - [Simeone, Osvaldo](https://nms.kcl.ac.uk/osvaldo.simeone/index.htm), e-mail: osvaldo.simeone AT kcl.ac.uk
 - [Bi, Suzhi](https://sites.google.com/view/bisuzhi/), e-mail: bsz AT kcl.ac.uk
